@@ -229,6 +229,62 @@ class ApiClient {
   async getTradeStats() {
     return this.request('/trades/stats');
   }
+
+  // ========== SOLANA ==========
+
+  // Wallets
+  async getSolanaWallets() {
+    return this.request('/solana/wallets');
+  }
+
+  async addSolanaWallet(address: string, label?: string) {
+    return this.request('/solana/wallets', {
+      method: 'POST',
+      body: JSON.stringify({ address, label }),
+    });
+  }
+
+  async removeSolanaWallet(walletId: number) {
+    return this.request(`/solana/wallets/${walletId}`, { method: 'DELETE' });
+  }
+
+  // Trades
+  async getSolanaTrades(params?: {
+    wallet_id?: number;
+    side?: string;
+    skip?: number;
+    limit?: number;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params?.wallet_id) queryParams.set('wallet_id', params.wallet_id.toString());
+    if (params?.side) queryParams.set('side', params.side);
+    if (params?.skip) queryParams.set('skip', params.skip.toString());
+    if (params?.limit) queryParams.set('limit', params.limit.toString());
+
+    const queryString = queryParams.toString();
+    return this.request(`/solana/trades${queryString ? `?${queryString}` : ''}`);
+  }
+
+  async getSolanaTrade(tradeId: number) {
+    return this.request(`/solana/trades/${tradeId}`);
+  }
+
+  async getSolanaStats() {
+    return this.request('/solana/trades/stats');
+  }
+
+  async linkSolanaTrades(entryTradeId: number, exitTradeId: number) {
+    return this.request(`/solana/trades/${entryTradeId}/link/${exitTradeId}`, {
+      method: 'POST',
+    });
+  }
+
+  async updateSolanaTradeNotes(tradeId: number, notes: string) {
+    return this.request(`/solana/trades/${tradeId}/notes`, {
+      method: 'PUT',
+      body: JSON.stringify({ notes }),
+    });
+  }
 }
 
 export const api = new ApiClient();

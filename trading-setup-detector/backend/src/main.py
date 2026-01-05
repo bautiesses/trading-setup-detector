@@ -9,6 +9,7 @@ from src.watchlist.router import router as watchlist_router
 from src.scanner.router import router as scanner_router
 from src.binance.router import router as binance_router
 from src.trades.router import router as trades_router
+from src.solana.router import router as solana_router
 
 settings = get_settings()
 
@@ -20,6 +21,7 @@ async def lifespan(app: FastAPI):
     from src.watchlist.models import WatchlistItem
     from src.scanner.models import ScanResult, ScanExecution
     from src.trades.models import Trade
+    from src.solana.models import SolanaWallet, SolanaTrade, TokenCache
 
     # Startup
     await init_db()
@@ -57,6 +59,7 @@ app.include_router(watchlist_router, prefix="/api/v1")
 app.include_router(scanner_router, prefix="/api/v1")
 app.include_router(binance_router, prefix="/api/v1")
 app.include_router(trades_router, prefix="/api/v1")
+app.include_router(solana_router, prefix="/api/v1")
 
 
 @app.get("/")

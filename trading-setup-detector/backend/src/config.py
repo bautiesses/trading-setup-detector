@@ -37,6 +37,19 @@ class Settings(BaseSettings):
     patterns_dir: str = "uploads/patterns"
     charts_dir: str = "uploads/charts"
 
+    # Solana / Helius
+    helius_api_key: str = ""
+    helius_webhook_secret: str = ""
+
+    # Birdeye
+    birdeye_api_key: str = ""
+
+    # App URL (for webhook callbacks)
+    app_base_url: str = "http://localhost:8000"
+
+    # Solana charts
+    solana_charts_dir: str = "uploads/solana_charts"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

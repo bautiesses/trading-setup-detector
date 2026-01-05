@@ -132,3 +132,60 @@ export interface Kline {
   volume: number;
   close_time: number;
 }
+
+// Solana types
+export interface SolanaWallet {
+  id: number;
+  address: string;
+  label: string | null;
+  is_active: boolean;
+  helius_webhook_id: string | null;
+  created_at: string;
+}
+
+export interface SolanaTrade {
+  id: number;
+  wallet_id: number;
+  tx_signature: string;
+  block_time: string;
+  side: 'buy' | 'sell';
+
+  token_in_address: string;
+  token_in_symbol: string | null;
+  token_in_name: string | null;
+  token_in_amount: number;
+  token_in_usd_value: number | null;
+
+  token_out_address: string;
+  token_out_symbol: string | null;
+  token_out_name: string | null;
+  token_out_amount: number;
+  token_out_usd_value: number | null;
+
+  price_per_token: number | null;
+  price_usd: number | null;
+
+  fee_sol: number | null;
+  fee_usd: number | null;
+
+  linked_trade_id: number | null;
+  pnl: number | null;
+  pnl_percent: number | null;
+
+  chart_image_url: string | null;
+  notes: string | null;
+  dex_name: string;
+
+  created_at: string;
+}
+
+export interface SolanaTradeStats {
+  total_trades: number;
+  buy_trades: number;
+  sell_trades: number;
+  total_volume_usd: number;
+  total_fees_sol: number;
+  linked_pnl: number;
+  winning_trades: number;
+  losing_trades: number;
+}
