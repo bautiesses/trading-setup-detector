@@ -35,8 +35,6 @@ export function SolanaTradeTracker() {
   const [linkMode, setLinkMode] = useState(false);
   const [selectedEntryTrade, setSelectedEntryTrade] = useState<number | null>(null);
 
-  // Image modal
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -371,17 +369,15 @@ export function SolanaTradeTracker() {
                         TX <ExternalLink className="h-3 w-3" />
                       </a>
                     </div>
-                    {trade.chart_image_url && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedImage(trade.chart_image_url);
-                        }}
-                        className="text-purple-400 hover:text-purple-300 flex items-center gap-1"
-                      >
-                        <ImageIcon className="h-3 w-3" /> Ver Chart
-                      </button>
-                    )}
+                    <a
+                      href={`https://dexscreener.com/solana/${trade.side === 'buy' ? trade.token_out_address : trade.token_in_address}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-purple-400 hover:text-purple-300 flex items-center gap-1"
+                    >
+                      <ImageIcon className="h-3 w-3" /> DexScreener
+                    </a>
                   </div>
                 </div>
               ))
@@ -390,21 +386,6 @@ export function SolanaTradeTracker() {
         </CardContent>
       </Card>
 
-      {/* Image Modal */}
-      {selectedImage && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
-          onClick={() => setSelectedImage(null)}
-        >
-          <div className="max-w-4xl max-h-[90vh] p-4">
-            <img
-              src={`http://localhost:8000/${selectedImage}`}
-              alt="Trade Chart"
-              className="max-w-full max-h-full rounded-lg"
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -115,10 +115,10 @@ class TokenMetadataService:
         return None
 
     async def _fetch_token_info(self, address: str) -> Optional[dict]:
-        """Fetch token info from Jupiter Token List API"""
+        """Fetch token info from Jupiter Token List API (FREE)"""
         try:
             async with httpx.AsyncClient() as client:
-                # Try Jupiter's token API first
+                # Jupiter's token API (FREE, official)
                 response = await client.get(
                     f"https://tokens.jup.ag/token/{address}",
                     timeout=10.0
@@ -127,25 +127,21 @@ class TokenMetadataService:
                 if response.status_code == 200:
                     return response.json()
 
-                # Fallback to Birdeye if Jupiter fails
-                if settings.birdeye_api_key:
-                    response = await client.get(
-                        "https://public-api.birdeye.so/defi/token_overview",
-                        params={"address": address},
-                        headers={
-                            "X-API-KEY": settings.birdeye_api_key,
-                            "x-chain": "solana"
-                        },
-                        timeout=10.0
-                    )
+                # Fallback: try Solana FM (FREE)
+                response = await client.get(
+                    f"https://api.solana.fm/v1/tokens/{address}",
+                    timeout=10.0
+                )
 
-                    if response.status_code == 200:
-                        data = response.json().get("data", {})
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("result"):
+                        token_info = data["result"]
                         return {
-                            "symbol": data.get("symbol"),
-                            "name": data.get("name"),
-                            "decimals": data.get("decimals", 9),
-                            "logoURI": data.get("logoURI")
+                            "symbol": token_info.get("symbol"),
+                            "name": token_info.get("name"),
+                            "decimals": token_info.get("decimals", 9),
+                            "logoURI": token_info.get("logo")
                         }
 
         except Exception as e:

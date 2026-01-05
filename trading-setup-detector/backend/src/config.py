@@ -41,9 +41,6 @@ class Settings(BaseSettings):
     helius_api_key: str = ""
     helius_webhook_secret: str = ""
 
-    # Birdeye
-    birdeye_api_key: str = ""
-
     # App URL (for webhook callbacks)
     app_base_url: str = "http://localhost:8000"
 
