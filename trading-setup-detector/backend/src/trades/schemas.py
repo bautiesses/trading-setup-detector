@@ -33,6 +33,8 @@ class TradeUpdate(BaseModel):
     image_url: Optional[str] = None
     exit_notes: Optional[str] = None
     exit_image_url: Optional[str] = None
+    review_notes: Optional[str] = None
+    review_image_url: Optional[str] = None
     timeframe: Optional[str] = None
     strategy: Optional[str] = None
     exit_date: Optional[datetime] = None
@@ -43,6 +45,11 @@ class TradeClose(BaseModel):
     fees: Optional[float] = 0
     exit_notes: Optional[str] = None
     exit_image_url: Optional[str] = None
+
+
+class TradeReview(BaseModel):
+    review_notes: Optional[str] = None
+    review_image_url: Optional[str] = None
 
 
 class TradeResponse(BaseModel):
@@ -62,6 +69,8 @@ class TradeResponse(BaseModel):
     image_url: Optional[str]
     exit_notes: Optional[str]
     exit_image_url: Optional[str]
+    review_notes: Optional[str]
+    review_image_url: Optional[str]
     timeframe: Optional[str]
     strategy: Optional[str]
     entry_date: datetime

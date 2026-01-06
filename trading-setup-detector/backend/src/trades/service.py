@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 
 from src.trades.models import Trade
-from src.trades.schemas import TradeCreate, TradeUpdate, TradeClose
+from src.trades.schemas import TradeCreate, TradeUpdate, TradeClose, TradeReview
 
 
 class TradeService:
@@ -122,6 +122,21 @@ class TradeService:
         trade.pnl_percent = (price_diff / trade.entry_price) * 100
         # PnL = size * (pnl% / 100) - fees
         trade.pnl = (trade.size * trade.pnl_percent / 100) - trade.fees
+
+        await self.db.commit()
+        await self.db.refresh(trade)
+        return trade
+
+    async def add_review(self, user_id: int, trade_id: int, data: TradeReview) -> Optional[Trade]:
+        """Add post-close review to a trade"""
+        trade = await self.get_trade(user_id, trade_id)
+        if not trade:
+            return None
+
+        if data.review_notes is not None:
+            trade.review_notes = data.review_notes
+        if data.review_image_url is not None:
+            trade.review_image_url = data.review_image_url
 
         await self.db.commit()
         await self.db.refresh(trade)

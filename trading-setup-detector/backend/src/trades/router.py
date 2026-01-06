@@ -10,6 +10,7 @@ from src.trades.schemas import (
     TradeCreate,
     TradeUpdate,
     TradeClose,
+    TradeReview,
     TradeResponse,
     TradesListResponse,
     TradeStatsResponse,
@@ -97,6 +98,21 @@ async def close_trade(
     """Close a trade and calculate PnL"""
     service = TradeService(db)
     trade = await service.close_trade(current_user.id, trade_id, data)
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    return trade
+
+
+@router.post("/{trade_id}/review", response_model=TradeResponse)
+async def add_trade_review(
+    trade_id: int,
+    data: TradeReview,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Add post-close review to a trade (notes and image)"""
+    service = TradeService(db)
+    trade = await service.add_review(current_user.id, trade_id, data)
     if not trade:
         raise HTTPException(status_code=404, detail="Trade not found")
     return trade

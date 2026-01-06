@@ -238,6 +238,13 @@ class ApiClient {
     });
   }
 
+  async addTradeReview(id: number, data: { review_notes?: string; review_image_url?: string }) {
+    return this.request(`/trades/${id}/review`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async deleteTrade(id: number) {
     return this.request(`/trades/${id}`, { method: 'DELETE' });
   }

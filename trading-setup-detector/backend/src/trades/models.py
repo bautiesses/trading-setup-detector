@@ -46,6 +46,10 @@ class Trade(Base):
     exit_notes = Column(Text, nullable=True)  # Exit/close notes
     exit_image_url = Column(Text, nullable=True)  # Exit image URL or base64
 
+    # Post-trade review (after close)
+    review_notes = Column(Text, nullable=True)  # Post-close analysis notes
+    review_image_url = Column(Text, nullable=True)  # Post-close analysis image
+
     # Timeframe & Strategy
     timeframe = Column(String(10), nullable=True)
     strategy = Column(String(100), nullable=True)  # e.g., "Break & Retest"
