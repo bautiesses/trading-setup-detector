@@ -26,8 +26,18 @@ def get_cors_origins():
     frontend_url = os.getenv("FRONTEND_URL")
     if frontend_url:
         origins.append(frontend_url)
-        # Also add without trailing slash
         origins.append(frontend_url.rstrip("/"))
+
+    # Add CORS_ORIGINS if set (comma-separated list or single URL)
+    cors_origins = os.getenv("CORS_ORIGINS")
+    if cors_origins:
+        for origin in cors_origins.split(","):
+            origin = origin.strip()
+            if origin and origin not in origins:
+                origins.append(origin)
+                origins.append(origin.rstrip("/"))
+
+    print(f"CORS Origins configured: {origins}")  # Debug log
     return origins
 
 
