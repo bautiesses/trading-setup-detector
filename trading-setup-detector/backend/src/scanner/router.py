@@ -122,14 +122,27 @@ async def get_scan_results(
 
 @router.delete("/results")
 async def clear_old_results(
-    days: int = Query(default=7, ge=1, le=30),
+    days: int = Query(default=7, ge=0, le=30),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Limpia resultados antiguos"""
+    """Limpia resultados antiguos. Si days=0, borra TODOS los resultados."""
     service = ScannerService(db)
     await service.clear_old_results(current_user.id, days)
+    if days == 0:
+        return {"success": True, "message": "Todos los resultados eliminados"}
     return {"success": True, "message": f"Resultados mayores a {days} días eliminados"}
+
+
+@router.delete("/duplicates")
+async def clear_duplicate_signals(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Elimina señales duplicadas, manteniendo solo la más antigua de cada tipo"""
+    service = ScannerService(db)
+    deleted_count = await service.clear_duplicate_signals(current_user.id)
+    return {"success": True, "deleted": deleted_count, "message": f"{deleted_count} señales duplicadas eliminadas"}
 
 
 # ============ Auto Scanner Endpoints ============

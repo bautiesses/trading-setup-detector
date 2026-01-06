@@ -66,6 +66,10 @@ class JupiterParser:
         if tx.get("type") == "SWAP":
             return True
 
+        # Check if source is Jupiter (even if type is UNKNOWN)
+        if tx.get("source") == "JUPITER":
+            return True
+
         # Check for Jupiter program in account keys or instructions
         account_keys = tx.get("accountData", [])
         for account in account_keys:
@@ -91,25 +95,50 @@ class JupiterParser:
             # Find user's transfers (fromUserAccount or toUserAccount matching signer)
             signer = self._get_signer(tx)
 
-            # Token in: user is the fromUserAccount
-            token_in = None
+            # Aggregate all transfers by mint for the user
+            # Token IN: sum of all tokens the user sent (fromUserAccount == signer)
+            # Token OUT: sum of all tokens the user received (toUserAccount == signer)
+            tokens_sent: Dict[str, float] = {}
+            tokens_received: Dict[str, float] = {}
+
             for transfer in token_transfers:
+                mint = transfer.get("mint", "")
+                amount = float(transfer.get("tokenAmount", 0))
+
                 if transfer.get("fromUserAccount") == signer:
-                    token_in = transfer
-                    break
-
-            # Token out: user is the toUserAccount
-            token_out = None
-            for transfer in reversed(token_transfers):
+                    tokens_sent[mint] = tokens_sent.get(mint, 0) + amount
                 if transfer.get("toUserAccount") == signer:
-                    token_out = transfer
-                    break
+                    tokens_received[mint] = tokens_received.get(mint, 0) + amount
 
-            # Fallback to first/last if signer matching fails
-            if not token_in:
+            # Determine token_in (what user spent most of, excluding what they also received)
+            # and token_out (what user received most of, excluding what they also sent)
+            net_sent = {}
+            net_received = {}
+
+            for mint, amt in tokens_sent.items():
+                net = amt - tokens_received.get(mint, 0)
+                if net > 0:
+                    net_sent[mint] = net
+
+            for mint, amt in tokens_received.items():
+                net = amt - tokens_sent.get(mint, 0)
+                if net > 0:
+                    net_received[mint] = net
+
+            if not net_sent or not net_received:
+                # Fallback to first/last transfer
                 token_in = token_transfers[0]
-            if not token_out:
                 token_out = token_transfers[-1]
+                token_in_address = token_in.get("mint", "")
+                token_in_amount = float(token_in.get("tokenAmount", 0))
+                token_out_address = token_out.get("mint", "")
+                token_out_amount = float(token_out.get("tokenAmount", 0))
+            else:
+                # Get the main tokens (highest amounts)
+                token_in_address = max(net_sent, key=net_sent.get)
+                token_in_amount = net_sent[token_in_address]
+                token_out_address = max(net_received, key=net_received.get)
+                token_out_amount = net_received[token_out_address]
 
             # Parse timestamp
             timestamp = tx.get("timestamp", 0)
@@ -122,12 +151,12 @@ class JupiterParser:
                 tx_signature=tx.get("signature", ""),
                 slot=tx.get("slot", 0),
                 block_time=block_time,
-                token_in_address=token_in.get("mint", ""),
-                token_in_amount=float(token_in.get("tokenAmount", 0)),
-                token_in_decimals=token_in.get("decimals", 9),
-                token_out_address=token_out.get("mint", ""),
-                token_out_amount=float(token_out.get("tokenAmount", 0)),
-                token_out_decimals=token_out.get("decimals", 9),
+                token_in_address=token_in_address,
+                token_in_amount=token_in_amount,
+                token_in_decimals=9,  # Default, will use metadata later
+                token_out_address=token_out_address,
+                token_out_amount=token_out_amount,
+                token_out_decimals=9,
                 fee_sol=tx.get("fee", 0) / 1e9,
                 signer=signer,
                 raw_data=tx
@@ -186,12 +215,26 @@ class JupiterParser:
         Determine if this is a BUY or SELL.
 
         Logic:
-        - If token_in is a stablecoin/SOL and token_out is another token -> BUY
-        - If token_in is a token and token_out is stablecoin/SOL -> SELL
+        - If token_in is a stablecoin and token_out is SOL or another token -> BUY
+        - If token_in is SOL or another token and token_out is stablecoin -> SELL
+        - SOL -> Stablecoin = SELL (you're selling SOL)
+        - Stablecoin -> SOL = BUY (you're buying SOL)
         """
-        if token_in_address in self.QUOTE_TOKENS and token_out_address not in self.QUOTE_TOKENS:
+        # Stablecoins take priority - they represent USD
+        token_in_is_stable = token_in_address in self.STABLECOINS
+        token_out_is_stable = token_out_address in self.STABLECOINS
+
+        if token_in_is_stable and not token_out_is_stable:
+            # Spending stablecoin to get something = BUY
             return "buy"
-        elif token_in_address not in self.QUOTE_TOKENS and token_out_address in self.QUOTE_TOKENS:
+        elif not token_in_is_stable and token_out_is_stable:
+            # Getting stablecoin for something = SELL
+            return "sell"
+        elif token_in_address == self.SOL_MINT and token_out_address not in self.QUOTE_TOKENS:
+            # SOL -> non-quote token = BUY (buying with SOL)
+            return "buy"
+        elif token_in_address not in self.QUOTE_TOKENS and token_out_address == self.SOL_MINT:
+            # Non-quote token -> SOL = SELL (selling for SOL)
             return "sell"
         else:
             # Token to token swap - consider it a buy of token_out

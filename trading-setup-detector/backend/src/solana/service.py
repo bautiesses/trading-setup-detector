@@ -1,7 +1,7 @@
 from typing import List, Optional, Tuple
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, and_
 
 from src.solana.models import SolanaWallet, SolanaTrade, TokenCache
 from src.solana.schemas import SolanaWalletCreate
@@ -12,6 +12,9 @@ from src.solana.token_metadata import token_metadata_service
 from src.config import get_settings
 
 settings = get_settings()
+
+# Minimum USD value to track trades
+MIN_TRADE_USD = 10000
 
 
 class SolanaTradeService:
@@ -59,17 +62,55 @@ class SolanaTradeService:
             swap.token_out_address
         )
 
-        # Get USD prices
-        token_in_price = await solana_chart_client.get_current_token_price(swap.token_in_address)
-        token_out_price = await solana_chart_client.get_current_token_price(swap.token_out_address)
+        # Stablecoin addresses (USDC, USDT) - amounts are already in USD
+        STABLECOINS = {
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",  # USDC
+            "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",  # USDT
+        }
 
-        # Calculate USD values
-        token_in_usd = swap.token_in_amount * (token_in_price or 0)
-        token_out_usd = swap.token_out_amount * (token_out_price or 0)
+        # Calculate USD values - use stablecoin amount directly if available
+        if swap.token_in_address in STABLECOINS:
+            token_in_usd = swap.token_in_amount  # Amount IS the USD value
+            token_in_price = 1.0
+        else:
+            token_in_price = await solana_chart_client.get_current_token_price(swap.token_in_address)
+            token_in_usd = swap.token_in_amount * (token_in_price or 0)
 
-        # Calculate price per token
-        if swap.token_in_amount > 0:
-            price_per_token = swap.token_out_amount / swap.token_in_amount
+        if swap.token_out_address in STABLECOINS:
+            token_out_usd = swap.token_out_amount  # Amount IS the USD value
+            token_out_price = 1.0
+        else:
+            token_out_price = await solana_chart_client.get_current_token_price(swap.token_out_address)
+            token_out_usd = swap.token_out_amount * (token_out_price or 0)
+
+        # Use the higher USD value (whichever we can calculate)
+        trade_usd_value = max(token_in_usd, token_out_usd)
+
+        # Filter: only track trades >= MIN_TRADE_USD
+        # Exception: always track SELLS if there's a matching open BUY (to calculate PnL)
+        if trade_usd_value < MIN_TRADE_USD:
+            if side == "sell":
+                # Check if there's an unlinked BUY for this token
+                sold_token = swap.token_in_address
+                has_open_buy = await self._has_unlinked_buy(wallet.user_id, sold_token)
+                if has_open_buy:
+                    print(f"Trade below minimum but has matching buy, allowing sell")
+                else:
+                    print(f"Trade below minimum (${trade_usd_value:.2f} < ${MIN_TRADE_USD}), skipping")
+                    return None
+            else:
+                print(f"Trade below minimum (${trade_usd_value:.2f} < ${MIN_TRADE_USD}), skipping")
+                return None
+
+        # Calculate price per token (price of the traded token in USD)
+        # For BUY: we spend token_in to get token_out, so price = token_in_usd / token_out_amount
+        # For SELL: we spend token_in to get token_out, so price = token_out_usd / token_in_amount
+        if side == "buy" and swap.token_out_amount > 0:
+            # Price per token bought = USD spent / tokens received
+            price_per_token = token_in_usd / swap.token_out_amount if token_in_usd > 0 else (token_out_price or 0)
+        elif side == "sell" and swap.token_in_amount > 0:
+            # Price per token sold = USD received / tokens sold
+            price_per_token = token_out_usd / swap.token_in_amount if token_out_usd > 0 else (token_in_price or 0)
         else:
             price_per_token = 0
 
@@ -128,7 +169,116 @@ class SolanaTradeService:
         except Exception as e:
             print(f"Error generating chart: {e}")
 
+        # Try to auto-link trades (match sells with previous buys)
+        if side == "sell":
+            await self._try_auto_link_trade(trade)
+
         return trade
+
+    async def _try_auto_link_trade(self, sell_trade: SolanaTrade) -> bool:
+        """
+        Try to automatically link a sell trade with a matching buy trade.
+        Supports partial sells - multiple sells can link to the same buy.
+        Matches by:
+        - Same token (token sold = token bought)
+        - Buy must be before sell
+        - Buy must have remaining unsold quantity
+        """
+        # The token being sold is token_in for a sell trade
+        sold_token = sell_trade.token_in_address
+        sold_amount = sell_trade.token_in_amount
+
+        # Find buy trades for the same token (before this sell)
+        result = await self.db.execute(
+            select(SolanaTrade).where(
+                and_(
+                    SolanaTrade.user_id == sell_trade.user_id,
+                    SolanaTrade.side == "buy",
+                    SolanaTrade.token_out_address == sold_token,  # Bought same token
+                    SolanaTrade.block_time < sell_trade.block_time,  # Before this sell
+                )
+            ).order_by(SolanaTrade.block_time)  # Oldest first (FIFO)
+        )
+        potential_buys = list(result.scalars().all())
+
+        if not potential_buys:
+            return False
+
+        # For each buy, calculate how much has already been sold
+        for buy in potential_buys:
+            bought_amount = buy.token_out_amount
+            if bought_amount <= 0:
+                continue
+
+            # Get all sells already linked to this buy
+            linked_sells_result = await self.db.execute(
+                select(SolanaTrade).where(
+                    SolanaTrade.linked_trade_id == buy.id
+                )
+            )
+            linked_sells = list(linked_sells_result.scalars().all())
+
+            # Calculate total already sold from this buy
+            already_sold = sum(s.token_in_amount for s in linked_sells)
+            remaining = bought_amount - already_sold
+
+            # If there's remaining quantity, link this sell
+            if remaining > 0.0001:  # Small tolerance for floating point
+                # Calculate PnL based on proportion sold
+                entry_usd = buy.token_in_usd_value or 0  # What we paid for the buy
+                exit_usd = sell_trade.token_out_usd_value or 0  # What we received
+
+                # Adjust entry cost for partial sell
+                if bought_amount > 0:
+                    ratio = min(sold_amount, remaining) / bought_amount
+                    entry_usd = entry_usd * ratio
+
+                pnl = exit_usd - entry_usd
+                pnl_percent = (pnl / entry_usd * 100) if entry_usd > 0 else 0
+
+                # Update sell trade with link and PnL
+                sell_trade.linked_trade_id = buy.id
+                sell_trade.pnl = pnl
+                sell_trade.pnl_percent = pnl_percent
+
+                await self.db.commit()
+                print(f"Auto-linked: Buy #{buy.id} -> Sell #{sell_trade.id}, PnL: ${pnl:.2f} ({pnl_percent:.1f}%)")
+                return True
+
+        return False
+
+    async def _has_unlinked_buy(self, user_id: int, token_address: str) -> bool:
+        """Check if there's a BUY with remaining quantity for this token"""
+        # Get all buys for this token
+        result = await self.db.execute(
+            select(SolanaTrade).where(
+                and_(
+                    SolanaTrade.user_id == user_id,
+                    SolanaTrade.side == "buy",
+                    SolanaTrade.token_out_address == token_address,
+                )
+            )
+        )
+        buys = list(result.scalars().all())
+
+        for buy in buys:
+            bought_amount = buy.token_out_amount
+            if bought_amount <= 0:
+                continue
+
+            # Get all sells linked to this buy
+            linked_result = await self.db.execute(
+                select(SolanaTrade).where(SolanaTrade.linked_trade_id == buy.id)
+            )
+            linked_sells = list(linked_result.scalars().all())
+
+            already_sold = sum(s.token_in_amount for s in linked_sells)
+            remaining = bought_amount - already_sold
+
+            if remaining > 0.0001:
+                return True
+
+        return False
 
     async def _find_wallet_by_address(self, address: Optional[str]) -> Optional[SolanaWallet]:
         """Find wallet by address"""

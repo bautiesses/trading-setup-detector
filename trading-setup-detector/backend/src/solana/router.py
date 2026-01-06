@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Request, HTTPException, Header, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
+import httpx
 
 from src.database import get_db
 from src.auth.dependencies import get_current_active_user
@@ -15,6 +16,9 @@ from src.solana.schemas import (
     SolanaTradeStatsResponse,
     SolanaTradeNotesUpdate
 )
+from src.config import get_settings
+
+settings = get_settings()
 
 router = APIRouter(prefix="/solana", tags=["Solana"])
 
@@ -181,3 +185,44 @@ async def update_trade_notes(
     if not trade:
         raise HTTPException(status_code=404, detail="Trade not found")
     return trade
+
+
+@router.post("/import/{tx_signature}")
+async def import_transaction(
+    tx_signature: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Import a transaction manually by its signature.
+    Fetches the transaction from Helius and processes it.
+    """
+    # Fetch transaction from Helius
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"https://api.helius.xyz/v0/transactions/?api-key={settings.helius_api_key}",
+            json={"transactions": [tx_signature]},
+            timeout=30.0
+        )
+
+        if response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Could not fetch transaction from Helius")
+
+        data = response.json()
+        if not data:
+            raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Process the transaction
+    service = SolanaTradeService(db)
+
+    # Force type to SWAP for Jupiter transactions
+    tx_data = data[0]
+    if tx_data.get("source") == "JUPITER":
+        tx_data["type"] = "SWAP"
+
+    trades = await service.process_webhook_payload([tx_data])
+
+    if not trades:
+        raise HTTPException(status_code=400, detail="Could not process transaction as a trade")
+
+    return {"success": True, "trades_imported": len(trades)}

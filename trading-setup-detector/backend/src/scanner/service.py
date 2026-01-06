@@ -4,9 +4,9 @@ Scanner Service - Break & Retest Pattern Detection
 """
 
 from typing import List, Optional
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 import pandas as pd
 
 from src.scanner.models import ScanResult, ScannerConfig, ScanExecution
@@ -16,9 +16,45 @@ from src.binance.client import get_binance_client
 
 
 class ScannerService:
+    # Hours to consider a signal as duplicate
+    DUPLICATE_WINDOW_HOURS = 24
+    # Price tolerance for duplicate detection (0.5% = same level)
+    PRICE_TOLERANCE = 0.005
+
     def __init__(self, db: AsyncSession):
         self.db = db
         self.detector = create_detector("medium")
+
+    async def _signal_exists(
+        self,
+        user_id: int,
+        symbol: str,
+        timeframe: str,
+        pattern_type: str,
+        level_price: float
+    ) -> bool:
+        """Check if a similar signal already exists within the duplicate window"""
+        cutoff = datetime.now() - timedelta(hours=self.DUPLICATE_WINDOW_HOURS)
+
+        # Price range for duplicate detection
+        price_low = level_price * (1 - self.PRICE_TOLERANCE)
+        price_high = level_price * (1 + self.PRICE_TOLERANCE)
+
+        query = select(func.count()).select_from(ScanResult).where(
+            and_(
+                ScanResult.user_id == user_id,
+                ScanResult.symbol == symbol,
+                ScanResult.timeframe == timeframe,
+                ScanResult.pattern_type == pattern_type,
+                ScanResult.level_price >= price_low,
+                ScanResult.level_price <= price_high,
+                ScanResult.created_at >= cutoff
+            )
+        )
+
+        result = await self.db.execute(query)
+        count = result.scalar()
+        return count > 0
 
     async def run_scan(
         self,
@@ -74,8 +110,21 @@ class ScannerService:
                     
                     print(f"  Found {len(signals)} signals for {item.symbol} {tf}")
 
-                    # Guardar resultados
+                    # Guardar resultados (solo si no son duplicados)
                     for signal in signals:
+                        # Check if similar signal already exists
+                        is_duplicate = await self._signal_exists(
+                            user_id=user_id,
+                            symbol=signal.symbol,
+                            timeframe=signal.timeframe,
+                            pattern_type=signal.pattern_type.value,
+                            level_price=signal.level_price
+                        )
+
+                        if is_duplicate:
+                            print(f"  Skipping duplicate signal: {signal.symbol} {signal.timeframe} {signal.pattern_type.value}")
+                            continue
+
                         result = ScanResult(
                             user_id=user_id,
                             symbol=signal.symbol,
@@ -189,14 +238,55 @@ class ScannerService:
         }
 
     async def clear_old_results(self, user_id: int, days: int = 7):
-        """Limpia resultados antiguos"""
-        from datetime import timedelta
-        cutoff = datetime.now() - timedelta(days=days)
-        
-        await self.db.execute(
-            ScanResult.__table__.delete().where(
-                ScanResult.user_id == user_id,
-                ScanResult.created_at < cutoff
+        """Limpia resultados antiguos. Si days=0, borra TODOS los resultados."""
+        if days == 0:
+            # Clear ALL results
+            await self.db.execute(
+                ScanResult.__table__.delete().where(
+                    ScanResult.user_id == user_id
+                )
             )
-        )
+        else:
+            cutoff = datetime.now() - timedelta(days=days)
+            await self.db.execute(
+                ScanResult.__table__.delete().where(
+                    ScanResult.user_id == user_id,
+                    ScanResult.created_at < cutoff
+                )
+            )
         await self.db.commit()
+
+    async def clear_duplicate_signals(self, user_id: int) -> int:
+        """Remove duplicate signals keeping only the oldest one for each unique signal"""
+        # Get all signals grouped by unique key
+        query = select(ScanResult).where(
+            ScanResult.user_id == user_id
+        ).order_by(ScanResult.created_at.asc())
+
+        result = await self.db.execute(query)
+        all_signals = list(result.scalars().all())
+
+        # Track unique signals by (symbol, timeframe, pattern_type, rounded_level)
+        seen = {}
+        duplicates_to_delete = []
+
+        for signal in all_signals:
+            # Round level_price to avoid floating point issues
+            rounded_level = round(signal.level_price, 2)
+            key = (signal.symbol, signal.timeframe, signal.pattern_type, rounded_level)
+
+            if key in seen:
+                # This is a duplicate, mark for deletion
+                duplicates_to_delete.append(signal.id)
+            else:
+                seen[key] = signal.id
+
+        # Delete duplicates
+        if duplicates_to_delete:
+            from sqlalchemy import delete
+            await self.db.execute(
+                delete(ScanResult).where(ScanResult.id.in_(duplicates_to_delete))
+            )
+            await self.db.commit()
+
+        return len(duplicates_to_delete)

@@ -148,8 +148,13 @@ class ApiClient {
     return this.request(url);
   }
 
-  async clearScanResults(days: number = 7) {
+  async clearScanResults(days: number = 0) {
+    // days=0 means clear ALL results
     return this.request(`/scanner/results?days=${days}`, { method: 'DELETE' });
+  }
+
+  async clearDuplicateSignals() {
+    return this.request('/scanner/duplicates', { method: 'DELETE' });
   }
 
   // Binance
@@ -283,6 +288,12 @@ class ApiClient {
     return this.request(`/solana/trades/${tradeId}/notes`, {
       method: 'PUT',
       body: JSON.stringify({ notes }),
+    });
+  }
+
+  async importSolanaTransaction(txSignature: string) {
+    return this.request(`/solana/import/${txSignature}`, {
+      method: 'POST',
     });
   }
 }
