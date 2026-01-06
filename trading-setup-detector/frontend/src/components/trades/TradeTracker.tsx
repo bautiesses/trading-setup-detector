@@ -43,6 +43,8 @@ interface Trade {
   image_url: string | null;
   exit_notes: string | null;
   exit_image_url: string | null;
+  review_notes: string | null;
+  review_image_url: string | null;
   timeframe: string | null;
   strategy: string | null;
   entry_date: string;
@@ -113,7 +115,14 @@ export function TradeTracker() {
     exit_image_url: '',
   });
 
+  const [showReviewForm, setShowReviewForm] = useState<number | null>(null);
+  const [reviewData, setReviewData] = useState({
+    review_notes: '',
+    review_image_url: '',
+  });
+
   const closeFileInputRef = useRef<HTMLInputElement>(null);
+  const reviewFileInputRef = useRef<HTMLInputElement>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -285,6 +294,52 @@ export function TradeTracker() {
       fetchStats();
     } catch (error) {
       console.error('Error deleting trade:', error);
+    }
+  };
+
+  const handleReview = async (tradeId: number) => {
+    try {
+      await api.addTradeReview(tradeId, {
+        review_notes: reviewData.review_notes || undefined,
+        review_image_url: reviewData.review_image_url || undefined,
+      });
+      setShowReviewForm(null);
+      setReviewData({ review_notes: '', review_image_url: '' });
+      fetchTrades();
+    } catch (error) {
+      console.error('Error adding review:', error);
+    }
+  };
+
+  const handleReviewImagePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const base64 = event.target?.result as string;
+            setReviewData({ ...reviewData, review_image_url: base64 });
+          };
+          reader.readAsDataURL(file);
+        }
+        break;
+      }
+    }
+  };
+
+  const handleReviewImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        setReviewData({ ...reviewData, review_image_url: base64 });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -984,6 +1039,31 @@ export function TradeTracker() {
                       </div>
                     )}
 
+                    {/* Review Section */}
+                    {(trade.review_image_url || trade.review_notes) && (
+                      <div className="border-t border-zinc-700 pt-3 mt-3">
+                        <div className="text-xs text-zinc-500 mb-2">🔍 Review Post-Cierre</div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {trade.review_image_url && (
+                            <img
+                              src={trade.review_image_url}
+                              alt="Review screenshot"
+                              className="max-h-64 rounded-lg border border-zinc-700 cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedImage({ url: trade.review_image_url!, type: 'exit', tradeId: trade.id });
+                              }}
+                            />
+                          )}
+                          {trade.review_notes && (
+                            <div className="text-sm text-zinc-300 bg-zinc-800/50 rounded p-3">
+                              {trade.review_notes}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Actions */}
                     <div className="flex gap-2">
                       {trade.status === 'open' && (
@@ -1086,6 +1166,79 @@ export function TradeTracker() {
                             <Button size="sm" variant="outline" onClick={() => setShowCloseForm(trade.id)}>
                               <DollarSign className="mr-2 h-4 w-4" />
                               Cerrar Trade
+                            </Button>
+                          )}
+                        </>
+                      )}
+                      {trade.status === 'closed' && (
+                        <>
+                          {showReviewForm === trade.id ? (
+                            <div className="flex-1 space-y-3">
+                              {/* Review Image Upload */}
+                              <div
+                                className="border-2 border-dashed border-blue-700 rounded-lg p-3 text-center cursor-pointer hover:border-blue-500 transition-colors"
+                                onPaste={handleReviewImagePaste}
+                                onClick={() => !reviewData.review_image_url && reviewFileInputRef.current?.click()}
+                              >
+                                {reviewData.review_image_url ? (
+                                  <div className="relative">
+                                    <img
+                                      src={reviewData.review_image_url}
+                                      alt="Review screenshot"
+                                      className="max-h-32 mx-auto rounded"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      size="icon"
+                                      className="absolute top-1 right-1 h-6 w-6"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setReviewData({ ...reviewData, review_image_url: '' });
+                                      }}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="text-blue-400 text-sm">
+                                    <ImageIcon className="h-6 w-6 mx-auto mb-1" />
+                                    <p>Pegar imagen de review (Ctrl+V)</p>
+                                  </div>
+                                )}
+                                <input
+                                  ref={reviewFileInputRef}
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleReviewImageUpload}
+                                  className="hidden"
+                                />
+                              </div>
+
+                              {/* Review Notes */}
+                              <textarea
+                                value={reviewData.review_notes}
+                                onChange={(e) => setReviewData({ ...reviewData, review_notes: e.target.value })}
+                                placeholder="¿Qué pasó después del cierre? ¿Tomaste la decisión correcta?"
+                                className="w-full bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-md px-3 py-2 text-sm min-h-[60px]"
+                              />
+
+                              <div className="flex gap-2">
+                                <Button size="sm" onClick={() => handleReview(trade.id)}>
+                                  <Check className="h-4 w-4 mr-1" /> Guardar Review
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => {
+                                  setShowReviewForm(null);
+                                  setReviewData({ review_notes: '', review_image_url: '' });
+                                }}>
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <Button size="sm" variant="outline" className="border-blue-600 text-blue-400 hover:bg-blue-600/20" onClick={() => setShowReviewForm(trade.id)}>
+                              <ImageIcon className="mr-2 h-4 w-4" />
+                              {trade.review_image_url || trade.review_notes ? 'Editar Review' : 'Agregar Review'}
                             </Button>
                           )}
                         </>
