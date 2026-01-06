@@ -1,7 +1,23 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-
 class ApiClient {
   private token: string | null = null;
+
+  private getApiBaseUrl(): string {
+    // Check environment variable first
+    if (process.env.NEXT_PUBLIC_API_URL) {
+      return process.env.NEXT_PUBLIC_API_URL;
+    }
+
+    // Auto-detect production (Railway)
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      if (hostname.includes('railway.app') || hostname.includes('gleaming-trust')) {
+        return 'https://trading-scanner-production-310a.up.railway.app/api/v1';
+      }
+    }
+
+    // Default to localhost for development
+    return 'http://localhost:8000/api/v1';
+  }
 
   setToken(token: string | null) {
     this.token = token;
@@ -39,7 +55,7 @@ class ApiClient {
 
     let response: Response;
     try {
-      response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      response = await fetch(`${this.getApiBaseUrl()}${endpoint}`, {
         ...options,
         headers,
       });
@@ -74,7 +90,7 @@ class ApiClient {
     formData.append('username', username);
     formData.append('password', password);
 
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    const response = await fetch(`${this.getApiBaseUrl()}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: formData,
