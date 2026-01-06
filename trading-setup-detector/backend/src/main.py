@@ -55,8 +55,7 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
     from src.binance.client import binance_client
-    if binance_client.client:
-        await binance_client.close()
+    await binance_client.close()
 
 
 app = FastAPI(

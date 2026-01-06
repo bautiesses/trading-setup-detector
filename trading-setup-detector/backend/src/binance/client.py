@@ -1,25 +1,22 @@
-from binance import AsyncClient
+import httpx
 from typing import List, Optional
 import pandas as pd
-from src.config import get_settings
 from src.binance.schemas import Kline, SymbolInfo
 
-settings = get_settings()
+# Public Binance API - no authentication needed
+BINANCE_BASE_URL = "https://api.binance.com/api/v3"
 
 
 class BinanceClient:
     def __init__(self):
-        self.client: Optional[AsyncClient] = None
+        self.client: Optional[httpx.AsyncClient] = None
 
     async def connect(self):
-        self.client = await AsyncClient.create(
-            api_key=settings.binance_api_key or None,
-            api_secret=settings.binance_api_secret or None
-        )
+        self.client = httpx.AsyncClient(timeout=30.0)
 
     async def close(self):
         if self.client:
-            await self.client.close_connection()
+            await self.client.aclose()
 
     async def get_klines(
         self,
@@ -30,11 +27,16 @@ class BinanceClient:
         if not self.client:
             await self.connect()
 
-        klines = await self.client.get_klines(
-            symbol=symbol,
-            interval=interval,
-            limit=limit
+        response = await self.client.get(
+            f"{BINANCE_BASE_URL}/klines",
+            params={
+                "symbol": symbol,
+                "interval": interval,
+                "limit": limit
+            }
         )
+        response.raise_for_status()
+        klines = response.json()
         return [self._parse_kline(k) for k in klines]
 
     async def get_klines_df(
@@ -53,7 +55,10 @@ class BinanceClient:
         if not self.client:
             await self.connect()
 
-        info = await self.client.get_exchange_info()
+        response = await self.client.get(f"{BINANCE_BASE_URL}/exchangeInfo")
+        response.raise_for_status()
+        info = response.json()
+
         symbols = []
         for s in info['symbols']:
             if s['status'] == 'TRADING' and s['quoteAsset'] == 'USDT':
@@ -69,7 +74,12 @@ class BinanceClient:
         if not self.client:
             await self.connect()
 
-        ticker = await self.client.get_symbol_ticker(symbol=symbol)
+        response = await self.client.get(
+            f"{BINANCE_BASE_URL}/ticker/price",
+            params={"symbol": symbol}
+        )
+        response.raise_for_status()
+        ticker = response.json()
         return float(ticker['price'])
 
     def _parse_kline(self, raw: list) -> Kline:
