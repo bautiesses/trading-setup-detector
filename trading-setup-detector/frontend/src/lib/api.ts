@@ -2,21 +2,16 @@ class ApiClient {
   private token: string | null = null;
 
   private getApiBaseUrl(): string {
-    // Check environment variable first
-    if (process.env.NEXT_PUBLIC_API_URL) {
-      return process.env.NEXT_PUBLIC_API_URL;
-    }
-
-    // Auto-detect production (Railway)
+    // Check if running on localhost (development)
     if (typeof window !== 'undefined') {
       const hostname = window.location.hostname;
-      if (hostname.includes('railway.app') || hostname.includes('gleaming-trust')) {
-        return 'https://trading-scanner-production-310a.up.railway.app/api/v1';
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return 'http://localhost:8000/api/v1';
       }
     }
 
-    // Default to localhost for development
-    return 'http://localhost:8000/api/v1';
+    // Production URL (Railway)
+    return 'https://trading-scanner-production-310a.up.railway.app/api/v1';
   }
 
   setToken(token: string | null) {
