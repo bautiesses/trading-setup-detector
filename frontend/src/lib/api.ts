@@ -1,5 +1,28 @@
+// Simple cache for API responses
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const cache: Map<string, CacheEntry<unknown>> = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes default
+const SYMBOLS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes for symbols
+
 class ApiClient {
   private token: string | null = null;
+
+  private getCache<T>(key: string, ttl: number = CACHE_TTL): T | null {
+    const entry = cache.get(key);
+    if (entry && Date.now() - entry.timestamp < ttl) {
+      return entry.data as T;
+    }
+    cache.delete(key);
+    return null;
+  }
+
+  private setCache<T>(key: string, data: T): void {
+    cache.set(key, { data, timestamp: Date.now() });
+  }
 
   private getApiBaseUrl(): string {
     // Use environment variable if available (production)
@@ -175,7 +198,13 @@ class ApiClient {
 
   // Binance
   async getSymbols() {
-    return this.request('/binance/symbols');
+    const cacheKey = 'binance_symbols';
+    const cached = this.getCache(cacheKey, SYMBOLS_CACHE_TTL);
+    if (cached) return cached;
+
+    const data = await this.request('/binance/symbols');
+    this.setCache(cacheKey, data);
+    return data;
   }
 
   async getKlines(symbol: string, interval: string, limit = 200) {

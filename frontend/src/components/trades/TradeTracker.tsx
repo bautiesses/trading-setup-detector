@@ -1,13 +1,19 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { ImageEditor } from '@/components/image-editor';
 import { TradeCalendar } from './TradeCalendar';
 import { api } from '@/lib/api';
+
+// Lazy load ImageEditor - fabric.js es pesado (~350KB)
+const ImageEditor = dynamic(() => import('@/components/image-editor').then(mod => ({ default: mod.ImageEditor })), {
+  loading: () => <div className="h-64 flex items-center justify-center text-zinc-400">Cargando editor...</div>,
+  ssr: false
+});
 import {
   Plus,
   TrendingUp,

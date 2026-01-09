@@ -1,12 +1,18 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { Play, TrendingUp, TrendingDown, RefreshCw, Trash2, BarChart3, Power, Bell, BellOff } from 'lucide-react';
-import { SignalChart } from '@/components/charts/SignalChart';
+
+// Lazy load SignalChart - solo se carga cuando se abre el modal
+const SignalChart = dynamic(() => import('@/components/charts/SignalChart').then(mod => ({ default: mod.SignalChart })), {
+  loading: () => <div className="h-[300px] flex items-center justify-center text-zinc-400">Cargando gráfico...</div>,
+  ssr: false
+});
 
 interface ScanResult {
   id: number;
