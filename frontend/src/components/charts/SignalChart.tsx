@@ -138,12 +138,27 @@ export function SignalChart({ symbol, timeframe, levelPrice, patternType, onClos
   }, [symbol, timeframe, levelPrice, patternType]);
 
   useEffect(() => {
-    // Delay para asegurar que el modal esté visible y tenga dimensiones
-    const timer = setTimeout(() => {
-      initChart();
-    }, 100);
+    let resizeObserver: ResizeObserver | null = null;
+    let initialized = false;
 
-    // Manejar resize
+    // Usar ResizeObserver para detectar cuando el contenedor tiene dimensiones
+    if (chartContainerRef.current) {
+      resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (entry && entry.contentRect.width > 0) {
+          if (!initialized) {
+            initialized = true;
+            initChart();
+          } else if (chartRef.current) {
+            // Actualizar ancho en resizes posteriores
+            chartRef.current.applyOptions({ width: entry.contentRect.width });
+          }
+        }
+      });
+      resizeObserver.observe(chartContainerRef.current);
+    }
+
+    // Manejar resize de ventana
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
         chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
@@ -153,7 +168,9 @@ export function SignalChart({ symbol, timeframe, levelPrice, patternType, onClos
     window.addEventListener('resize', handleResize);
 
     return () => {
-      clearTimeout(timer);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       window.removeEventListener('resize', handleResize);
       if (chartRef.current) {
         chartRef.current.remove();
