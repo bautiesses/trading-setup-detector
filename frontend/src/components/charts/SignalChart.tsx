@@ -222,20 +222,20 @@ export function SignalChart({ symbol, timeframe, levelPrice, patternType, onClos
         </div>
 
         {/* Chart */}
-        <div className="p-3">
+        <div className="p-3 relative">
           {loading && (
-            <div className="h-[300px] flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 z-10">
               <div className="text-zinc-400">Cargando gráfico...</div>
             </div>
           )}
           {error && (
-            <div className="h-[300px] flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 z-10">
               <div className="text-red-400">{error}</div>
             </div>
           )}
           <div
             ref={chartContainerRef}
-            className={`w-full ${loading || error ? 'hidden' : ''}`}
+            className="w-full h-[300px]"
           />
         </div>
 
