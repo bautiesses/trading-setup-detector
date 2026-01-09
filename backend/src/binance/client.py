@@ -3,13 +3,21 @@ from typing import List, Optional
 import pandas as pd
 from src.binance.schemas import Kline, SymbolInfo
 
-# Public Binance API - using api1 proxy to avoid regional restrictions
-BINANCE_BASE_URL = "https://api1.binance.com/api/v3"
+# Public Binance API endpoints to try (some may be blocked by region)
+BINANCE_ENDPOINTS = [
+    "https://data-api.binance.vision/api/v3",  # Data API - less restricted
+    "https://api.binance.com/api/v3",
+    "https://api1.binance.com/api/v3",
+    "https://api2.binance.com/api/v3",
+    "https://api3.binance.com/api/v3",
+]
+BINANCE_BASE_URL = BINANCE_ENDPOINTS[0]
 
 
 class BinanceClient:
     def __init__(self):
         self.client: Optional[httpx.AsyncClient] = None
+        self.working_endpoint: str = BINANCE_BASE_URL
 
     async def connect(self):
         self.client = httpx.AsyncClient(timeout=30.0)
@@ -18,25 +26,41 @@ class BinanceClient:
         if self.client:
             await self.client.aclose()
 
+    async def _request_with_fallback(self, path: str, params: dict = None) -> dict:
+        """Try multiple Binance endpoints until one works"""
+        if not self.client:
+            await self.connect()
+
+        last_error = None
+        endpoints_to_try = [self.working_endpoint] + [e for e in BINANCE_ENDPOINTS if e != self.working_endpoint]
+
+        for endpoint in endpoints_to_try:
+            try:
+                response = await self.client.get(f"{endpoint}{path}", params=params)
+                response.raise_for_status()
+                self.working_endpoint = endpoint  # Remember working endpoint
+                return response.json()
+            except httpx.HTTPStatusError as e:
+                last_error = e
+                if e.response.status_code == 451:  # Region blocked, try next
+                    continue
+                raise  # Other errors, don't retry
+            except Exception as e:
+                last_error = e
+                continue
+
+        raise last_error or Exception("All Binance endpoints failed")
+
     async def get_klines(
         self,
         symbol: str,
         interval: str,
         limit: int = 200
     ) -> List[Kline]:
-        if not self.client:
-            await self.connect()
-
-        response = await self.client.get(
-            f"{BINANCE_BASE_URL}/klines",
-            params={
-                "symbol": symbol,
-                "interval": interval,
-                "limit": limit
-            }
+        klines = await self._request_with_fallback(
+            "/klines",
+            params={"symbol": symbol, "interval": interval, "limit": limit}
         )
-        response.raise_for_status()
-        klines = response.json()
         return [self._parse_kline(k) for k in klines]
 
     async def get_klines_df(
@@ -52,12 +76,7 @@ class BinanceClient:
         return df
 
     async def get_all_usdt_symbols(self) -> List[SymbolInfo]:
-        if not self.client:
-            await self.connect()
-
-        response = await self.client.get(f"{BINANCE_BASE_URL}/exchangeInfo")
-        response.raise_for_status()
-        info = response.json()
+        info = await self._request_with_fallback("/exchangeInfo")
 
         symbols = []
         for s in info['symbols']:
@@ -71,15 +90,7 @@ class BinanceClient:
         return symbols
 
     async def get_symbol_price(self, symbol: str) -> float:
-        if not self.client:
-            await self.connect()
-
-        response = await self.client.get(
-            f"{BINANCE_BASE_URL}/ticker/price",
-            params={"symbol": symbol}
-        )
-        response.raise_for_status()
-        ticker = response.json()
+        ticker = await self._request_with_fallback("/ticker/price", params={"symbol": symbol})
         return float(ticker['price'])
 
     def _parse_kline(self, raw: list) -> Kline:
