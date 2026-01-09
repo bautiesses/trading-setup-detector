@@ -146,25 +146,42 @@ class ApiClient {
 
   // Watchlist
   async getWatchlist(activeOnly = false) {
-    return this.request(`/watchlist/?active_only=${activeOnly}`);
+    const cacheKey = `watchlist_${activeOnly}`;
+    const cached = this.getCache(cacheKey, 60 * 1000); // 1 minute cache
+    if (cached) return cached;
+
+    const data = await this.request(`/watchlist/?active_only=${activeOnly}`);
+    this.setCache(cacheKey, data);
+    return data;
+  }
+
+  clearWatchlistCache() {
+    cache.delete('watchlist_false');
+    cache.delete('watchlist_true');
   }
 
   async addToWatchlist(symbol: string, timeframes: string[]) {
-    return this.request('/watchlist/', {
+    const result = await this.request('/watchlist/', {
       method: 'POST',
       body: JSON.stringify({ symbol, timeframes }),
     });
+    this.clearWatchlistCache();
+    return result;
   }
 
   async updateWatchlistItem(id: number, data: Record<string, unknown>) {
-    return this.request(`/watchlist/${id}`, {
+    const result = await this.request(`/watchlist/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+    this.clearWatchlistCache();
+    return result;
   }
 
   async removeFromWatchlist(id: number) {
-    return this.request(`/watchlist/${id}`, { method: 'DELETE' });
+    const result = await this.request(`/watchlist/${id}`, { method: 'DELETE' });
+    this.clearWatchlistCache();
+    return result;
   }
 
   // Scanner - Break & Retest

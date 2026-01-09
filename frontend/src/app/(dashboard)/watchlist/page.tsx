@@ -23,27 +23,16 @@ export default function WatchlistPage() {
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
-    fetchData();
+    fetchWatchlist();
   }, []);
 
-  const fetchData = async () => {
+  // Solo carga watchlist inicialmente - símbolos se cargan cuando se abre el modal
+  const fetchWatchlist = async () => {
     try {
-      const [watchlistData, symbolsData] = await Promise.all([
-        api.getWatchlist(),
-        api.getSymbols(),
-      ]);
-      console.log('Watchlist data:', watchlistData);
-      console.log('Symbols data:', symbolsData);
+      const watchlistData = await api.getWatchlist();
       setItems((watchlistData as { items: WatchlistItem[] }).items || []);
-      const symbolsList = (symbolsData as { symbols: Symbol[] }).symbols || [];
-      setSymbols(symbolsList);
-      console.log('Symbols set:', symbolsList.length);
-      if (symbolsList.length === 0) {
-        setSymbolsError('No symbols received from API');
-      }
     } catch (error) {
-      console.error('Error fetching data:', error);
-      setSymbolsError(error instanceof Error ? error.message : 'Unknown error');
+      console.error('Error fetching watchlist:', error);
     } finally {
       setLoading(false);
     }
@@ -85,7 +74,7 @@ export default function WatchlistPage() {
       setSelectedSymbols([]);
       setSelectedTimeframes(['1h', '4h']);
       setSearch('');
-      fetchData();
+      fetchWatchlist();
     } catch (error) {
       console.error('Error adding to watchlist:', error);
     } finally {
@@ -118,7 +107,7 @@ export default function WatchlistPage() {
 
     try {
       await api.removeFromWatchlist(id);
-      fetchData();
+      fetchWatchlist();
     } catch (error) {
       console.error('Error removing from watchlist:', error);
     }
@@ -127,7 +116,7 @@ export default function WatchlistPage() {
   const handleToggleActive = async (item: WatchlistItem) => {
     try {
       await api.updateWatchlistItem(item.id, { is_active: !item.is_active });
-      fetchData();
+      fetchWatchlist();
     } catch (error) {
       console.error('Error toggling item:', error);
     }
@@ -147,7 +136,24 @@ export default function WatchlistPage() {
   );
 
   if (loading) {
-    return <div className="min-h-screen" />;
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="h-9 w-32 bg-zinc-800 rounded animate-pulse" />
+          <div className="h-10 w-32 bg-zinc-800 rounded animate-pulse" />
+        </div>
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="flex items-center justify-between pb-4">
+                <div className="h-6 w-24 bg-zinc-800 rounded animate-pulse" />
+                <div className="h-8 w-20 bg-zinc-800 rounded animate-pulse" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
