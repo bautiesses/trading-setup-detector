@@ -2,6 +2,11 @@ class ApiClient {
   private token: string | null = null;
 
   private getApiBaseUrl(): string {
+    // Use environment variable if available (production)
+    if (process.env.NEXT_PUBLIC_API_URL) {
+      return process.env.NEXT_PUBLIC_API_URL;
+    }
+
     // Check if running on localhost (development)
     if (typeof window !== 'undefined') {
       const hostname = window.location.hostname;
@@ -10,7 +15,7 @@ class ApiClient {
       }
     }
 
-    // Production URL (Railway)
+    // Fallback to hardcoded production URL
     return 'https://trading-scanner-production-310a.up.railway.app/api/v1';
   }
 
