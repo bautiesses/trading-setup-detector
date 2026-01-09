@@ -14,6 +14,8 @@ export default function WatchlistPage() {
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [symbols, setSymbols] = useState<Symbol[]>([]);
   const [loading, setLoading] = useState(true);
+  const [symbolsLoading, setSymbolsLoading] = useState(false);
+  const [symbolsError, setSymbolsError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>([]);
@@ -30,12 +32,43 @@ export default function WatchlistPage() {
         api.getWatchlist(),
         api.getSymbols(),
       ]);
+      console.log('Watchlist data:', watchlistData);
+      console.log('Symbols data:', symbolsData);
       setItems((watchlistData as { items: WatchlistItem[] }).items || []);
-      setSymbols((symbolsData as { symbols: Symbol[] }).symbols || []);
+      const symbolsList = (symbolsData as { symbols: Symbol[] }).symbols || [];
+      setSymbols(symbolsList);
+      console.log('Symbols set:', symbolsList.length);
+      if (symbolsList.length === 0) {
+        setSymbolsError('No symbols received from API');
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
+      setSymbolsError(error instanceof Error ? error.message : 'Unknown error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSymbols = async () => {
+    if (symbols.length > 0) return; // Already loaded
+
+    setSymbolsLoading(true);
+    setSymbolsError(null);
+    try {
+      console.log('Fetching symbols...');
+      const symbolsData = await api.getSymbols();
+      console.log('Raw symbols response:', symbolsData);
+      const symbolsList = (symbolsData as { symbols: Symbol[] }).symbols || [];
+      console.log('Parsed symbols:', symbolsList.length);
+      setSymbols(symbolsList);
+      if (symbolsList.length === 0) {
+        setSymbolsError('No symbols available from Binance');
+      }
+    } catch (error) {
+      console.error('Error fetching symbols:', error);
+      setSymbolsError(error instanceof Error ? error.message : 'Failed to load symbols');
+    } finally {
+      setSymbolsLoading(false);
     }
   };
 
@@ -121,7 +154,7 @@ export default function WatchlistPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-white">Watchlist</h1>
-        <Button onClick={() => setShowAdd(true)}>
+        <Button onClick={() => { setShowAdd(true); fetchSymbols(); }}>
           <Plus className="mr-2 h-4 w-4" />
           Add Symbol
         </Button>
@@ -168,7 +201,30 @@ export default function WatchlistPage() {
                   </div>
                 </div>
                 <div className="max-h-64 overflow-y-auto border border-zinc-700 rounded-lg bg-zinc-800">
-                  {filteredSymbols.slice(0, 100).map((symbol) => (
+                  {symbolsLoading ? (
+                    <div className="px-3 py-8 text-center text-zinc-400 text-sm">
+                      Loading symbols from Binance...
+                    </div>
+                  ) : symbolsError ? (
+                    <div className="px-3 py-8 text-center">
+                      <p className="text-red-400 text-sm mb-2">Error: {symbolsError}</p>
+                      <button
+                        onClick={fetchSymbols}
+                        className="text-xs text-blue-400 hover:text-blue-300"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  ) : symbols.length === 0 ? (
+                    <div className="px-3 py-8 text-center text-zinc-400 text-sm">
+                      No symbols available. Check console for errors.
+                    </div>
+                  ) : filteredSymbols.length === 0 ? (
+                    <div className="px-3 py-8 text-center text-zinc-400 text-sm">
+                      No symbols match your search.
+                    </div>
+                  ) : (
+                    filteredSymbols.slice(0, 100).map((symbol) => (
                     <button
                       key={symbol.symbol}
                       onClick={() => toggleSymbol(symbol.symbol)}
@@ -194,7 +250,7 @@ export default function WatchlistPage() {
                       </div>
                       <span className={selectedSymbols.includes(symbol.symbol) ? 'text-blue-200' : 'text-zinc-400'}>{symbol.base_asset}</span>
                     </button>
-                  ))}
+                  )))}
                 </div>
                 {selectedSymbols.length > 0 && (
                   <p className="text-sm text-blue-400">{selectedSymbols.length} selected</p>
