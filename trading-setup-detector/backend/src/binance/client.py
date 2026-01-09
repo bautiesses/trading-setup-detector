@@ -3,8 +3,8 @@ from typing import List, Optional
 import pandas as pd
 from src.binance.schemas import Kline, SymbolInfo
 
-# Public Binance API - no authentication needed
-BINANCE_BASE_URL = "https://api.binance.com/api/v3"
+# Public Binance API - using api1 proxy to avoid regional restrictions
+BINANCE_BASE_URL = "https://api1.binance.com/api/v3"
 
 
 class BinanceClient:
