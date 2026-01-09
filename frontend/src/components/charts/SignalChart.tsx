@@ -138,7 +138,10 @@ export function SignalChart({ symbol, timeframe, levelPrice, patternType, onClos
   }, [symbol, timeframe, levelPrice, patternType]);
 
   useEffect(() => {
-    initChart();
+    // Delay para asegurar que el modal esté visible y tenga dimensiones
+    const timer = setTimeout(() => {
+      initChart();
+    }, 100);
 
     // Manejar resize
     const handleResize = () => {
@@ -150,6 +153,7 @@ export function SignalChart({ symbol, timeframe, levelPrice, patternType, onClos
     window.addEventListener('resize', handleResize);
 
     return () => {
+      clearTimeout(timer);
       window.removeEventListener('resize', handleResize);
       if (chartRef.current) {
         chartRef.current.remove();
