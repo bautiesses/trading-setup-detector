@@ -1307,6 +1307,54 @@ export function TradeTracker() {
                             </div>
                           </div>
 
+                          {/* Entry Image */}
+                          <div
+                            className="border-2 border-dashed border-zinc-700 rounded-lg p-3 text-center cursor-pointer hover:border-zinc-500 transition-colors"
+                            onPaste={handleImagePaste}
+                            onClick={() => !formData.image_url && fileInputRef.current?.click()}
+                          >
+                            {formData.image_url ? (
+                              <div className="relative">
+                                <img
+                                  src={formData.image_url}
+                                  alt="Entry screenshot"
+                                  className="max-h-32 mx-auto rounded"
+                                />
+                                <div className="absolute top-1 right-1 flex gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingImage({ source: 'entry', imageUrl: formData.image_url });
+                                    }}
+                                  >
+                                    <PenTool className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setFormData({ ...formData, image_url: '' });
+                                    }}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-zinc-400 text-sm">
+                                <ImageIcon className="h-6 w-6 mx-auto mb-1" />
+                                <p>📈 Imagen de entrada (Ctrl+V)</p>
+                              </div>
+                            )}
+                          </div>
+
                           {/* Entry Notes */}
                           <div>
                             <label className="text-xs text-zinc-400">Notas de entrada</label>
@@ -1355,6 +1403,54 @@ export function TradeTracker() {
                                   />
                                 </div>
                               </div>
+                              {/* Exit Image */}
+                              <div
+                                className="border-2 border-dashed border-zinc-700 rounded-lg p-3 text-center cursor-pointer hover:border-zinc-500 transition-colors"
+                                onPaste={handleExitImagePaste}
+                                onClick={() => !formData.exit_image_url && exitImageInputRef.current?.click()}
+                              >
+                                {formData.exit_image_url ? (
+                                  <div className="relative">
+                                    <img
+                                      src={formData.exit_image_url}
+                                      alt="Exit screenshot"
+                                      className="max-h-32 mx-auto rounded"
+                                    />
+                                    <div className="absolute top-1 right-1 flex gap-1">
+                                      <Button
+                                        type="button"
+                                        variant="secondary"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setEditingImage({ source: 'exit', imageUrl: formData.exit_image_url });
+                                        }}
+                                      >
+                                        <PenTool className="h-3 w-3" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="destructive"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setFormData({ ...formData, exit_image_url: '' });
+                                        }}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="text-zinc-400 text-sm">
+                                    <ImageIcon className="h-6 w-6 mx-auto mb-1" />
+                                    <p>📉 Imagen de cierre (Ctrl+V)</p>
+                                  </div>
+                                )}
+                              </div>
+
                               <div>
                                 <label className="text-xs text-zinc-400">Notas de cierre</label>
                                 <textarea
