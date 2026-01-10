@@ -301,7 +301,7 @@ class ApiClient {
     return result;
   }
 
-  async closeTrade(id: number, data: { exit_price: number; fees?: number; exit_notes?: string; exit_image_url?: string }) {
+  async closeTrade(id: number, data: { exit_price: number; fees?: number; exit_notes?: string; exit_image_url?: string; exit_date?: string }) {
     const result = await this.request(`/trades/${id}/close`, {
       method: 'POST',
       body: JSON.stringify(data),

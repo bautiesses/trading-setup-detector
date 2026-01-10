@@ -47,6 +47,7 @@ class TradeClose(BaseModel):
     fees: Optional[float] = 0
     exit_notes: Optional[str] = None
     exit_image_url: Optional[str] = None
+    exit_date: Optional[datetime] = None
 
 
 class TradeReview(BaseModel):

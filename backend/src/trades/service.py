@@ -105,7 +105,7 @@ class TradeService:
 
         trade.exit_price = data.exit_price
         trade.status = "closed"
-        trade.exit_date = datetime.now()
+        trade.exit_date = data.exit_date or datetime.now()
         trade.fees = data.fees or 0
 
         # Save exit notes and image separately

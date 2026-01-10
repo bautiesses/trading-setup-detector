@@ -122,6 +122,7 @@ export function TradeTracker() {
     fees: '',
     exit_notes: '',
     exit_image_url: '',
+    exit_date: '',
   });
 
   const [showReviewForm, setShowReviewForm] = useState<number | null>(null);
@@ -256,9 +257,10 @@ export function TradeTracker() {
         fees: closeData.fees ? parseFloat(closeData.fees) : 0,
         exit_notes: closeData.exit_notes || undefined,
         exit_image_url: closeData.exit_image_url || undefined,
+        exit_date: closeData.exit_date ? new Date(closeData.exit_date).toISOString() : undefined,
       });
       setShowCloseForm(null);
-      setCloseData({ exit_price: '', fees: '', exit_notes: '', exit_image_url: '' });
+      setCloseData({ exit_price: '', fees: '', exit_notes: '', exit_image_url: '', exit_date: '' });
       fetchTrades();
       fetchStats();
     } catch (error) {
@@ -1163,7 +1165,7 @@ export function TradeTracker() {
                         <>
                           {showCloseForm === trade.id ? (
                             <div className="flex-1 space-y-3">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <Input
                                   type="number"
                                   step="any"
@@ -1180,12 +1182,19 @@ export function TradeTracker() {
                                   onChange={(e) => setCloseData({ ...closeData, fees: e.target.value })}
                                   className="bg-zinc-800 border-zinc-700 w-24"
                                 />
+                                <Input
+                                  type="datetime-local"
+                                  value={closeData.exit_date}
+                                  onChange={(e) => setCloseData({ ...closeData, exit_date: e.target.value })}
+                                  className="bg-zinc-800 border-zinc-700 w-44"
+                                  title="Fecha de cierre"
+                                />
                                 <Button size="sm" onClick={() => handleClose(trade.id)}>
                                   <Check className="h-4 w-4" />
                                 </Button>
                                 <Button size="sm" variant="outline" onClick={() => {
                                   setShowCloseForm(null);
-                                  setCloseData({ exit_price: '', fees: '', exit_notes: '', exit_image_url: '' });
+                                  setCloseData({ exit_price: '', fees: '', exit_notes: '', exit_image_url: '', exit_date: '' });
                                 }}>
                                   <X className="h-4 w-4" />
                                 </Button>
