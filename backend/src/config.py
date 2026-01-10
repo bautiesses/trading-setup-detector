@@ -1,10 +1,24 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+import os
 
 
 class Settings(BaseSettings):
-    # Database
+    # Database - prefer PostgreSQL from environment
     database_url: str = "sqlite+aiosqlite:///./trading_detector.db"
+
+    @property
+    def async_database_url(self) -> str:
+        """Convert database URL to async-compatible format"""
+        url = self.database_url
+
+        # Railway provides postgres:// but asyncpg needs postgresql+asyncpg://
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+        return url
 
     # Security
     secret_key: str = "your-secret-key-change-in-production"

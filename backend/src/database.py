@@ -4,14 +4,19 @@ from src.config import get_settings
 
 settings = get_settings()
 
+# Use async_database_url which converts postgres:// to postgresql+asyncpg://
+database_url = settings.async_database_url
+
+# Adjust pool settings based on database type
+is_sqlite = database_url.startswith("sqlite")
+
 engine = create_async_engine(
-    settings.database_url,
+    database_url,
     echo=False,
     future=True,
     pool_pre_ping=True,
-    pool_recycle=300,
-    pool_size=5,
-    max_overflow=10
+    # SQLite doesn't support connection pooling the same way
+    **({"pool_recycle": 300, "pool_size": 5, "max_overflow": 10} if not is_sqlite else {})
 )
 
 AsyncSessionLocal = async_sessionmaker(
