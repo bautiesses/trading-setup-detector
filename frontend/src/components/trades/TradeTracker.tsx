@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { TradeCalendar } from './TradeCalendar';
 import { api } from '@/lib/api';
+import { compressImage } from '@/lib/imageUtils';
 
 // Lazy load ImageEditor - fabric.js es pesado (~350KB)
 const ImageEditor = dynamic(() => import('@/components/image-editor').then(mod => ({ default: mod.ImageEditor })), {
@@ -272,7 +273,7 @@ export function TradeTracker() {
     }
   };
 
-  const handleCloseImagePaste = (e: React.ClipboardEvent) => {
+  const handleCloseImagePaste = async (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
 
@@ -281,9 +282,10 @@ export function TradeTracker() {
         const file = item.getAsFile();
         if (file) {
           const reader = new FileReader();
-          reader.onload = (event) => {
+          reader.onload = async (event) => {
             const base64 = event.target?.result as string;
-            setCloseData({ ...closeData, exit_image_url: base64 });
+            const compressed = await compressImage(base64);
+            setCloseData({ ...closeData, exit_image_url: compressed });
           };
           reader.readAsDataURL(file);
         }
@@ -296,9 +298,10 @@ export function TradeTracker() {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         const base64 = event.target?.result as string;
-        setCloseData({ ...closeData, exit_image_url: base64 });
+        const compressed = await compressImage(base64);
+        setCloseData({ ...closeData, exit_image_url: compressed });
       };
       reader.readAsDataURL(file);
     }
@@ -329,7 +332,7 @@ export function TradeTracker() {
     }
   };
 
-  const handleReviewImagePaste = (e: React.ClipboardEvent) => {
+  const handleReviewImagePaste = async (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
 
@@ -338,9 +341,10 @@ export function TradeTracker() {
         const file = item.getAsFile();
         if (file) {
           const reader = new FileReader();
-          reader.onload = (event) => {
+          reader.onload = async (event) => {
             const base64 = event.target?.result as string;
-            setReviewData({ ...reviewData, review_image_url: base64 });
+            const compressed = await compressImage(base64);
+            setReviewData({ ...reviewData, review_image_url: compressed });
           };
           reader.readAsDataURL(file);
         }
@@ -353,9 +357,10 @@ export function TradeTracker() {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         const base64 = event.target?.result as string;
-        setReviewData({ ...reviewData, review_image_url: base64 });
+        const compressed = await compressImage(base64);
+        setReviewData({ ...reviewData, review_image_url: compressed });
       };
       reader.readAsDataURL(file);
     }
@@ -364,23 +369,26 @@ export function TradeTracker() {
   const handleImageEditorSave = async (editedBase64: string) => {
     if (!editingImage) return;
 
+    // Compress the edited image
+    const compressed = await compressImage(editedBase64);
+
     if (editingImage.source === 'entry') {
-      setFormData({ ...formData, image_url: editedBase64 });
+      setFormData({ ...formData, image_url: compressed });
     } else if (editingImage.source === 'exit') {
-      setFormData({ ...formData, exit_image_url: editedBase64 });
+      setFormData({ ...formData, exit_image_url: compressed });
     } else if (editingImage.source === 'closeForm') {
-      setCloseData({ ...closeData, exit_image_url: editedBase64 });
+      setCloseData({ ...closeData, exit_image_url: compressed });
     } else if (editingImage.source === 'viewEntry' && editingImage.tradeId) {
       // Update trade directly
       try {
-        await api.updateTrade(editingImage.tradeId, { image_url: editedBase64 });
+        await api.updateTrade(editingImage.tradeId, { image_url: compressed });
         fetchTrades();
       } catch (error) {
         console.error('Error updating trade image:', error);
       }
     } else if (editingImage.source === 'viewExit' && editingImage.tradeId) {
       try {
-        await api.updateTrade(editingImage.tradeId, { exit_image_url: editedBase64 });
+        await api.updateTrade(editingImage.tradeId, { exit_image_url: compressed });
         fetchTrades();
       } catch (error) {
         console.error('Error updating trade exit image:', error);
@@ -391,7 +399,7 @@ export function TradeTracker() {
     setExpandedImage(null);
   };
 
-  const handleImagePaste = (e: React.ClipboardEvent) => {
+  const handleImagePaste = async (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
 
@@ -400,9 +408,10 @@ export function TradeTracker() {
         const file = item.getAsFile();
         if (file) {
           const reader = new FileReader();
-          reader.onload = (event) => {
+          reader.onload = async (event) => {
             const base64 = event.target?.result as string;
-            setFormData({ ...formData, image_url: base64 });
+            const compressed = await compressImage(base64);
+            setFormData({ ...formData, image_url: compressed });
           };
           reader.readAsDataURL(file);
         }
@@ -415,9 +424,10 @@ export function TradeTracker() {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         const base64 = event.target?.result as string;
-        setFormData({ ...formData, image_url: base64 });
+        const compressed = await compressImage(base64);
+        setFormData({ ...formData, image_url: compressed });
       };
       reader.readAsDataURL(file);
     }
@@ -425,7 +435,7 @@ export function TradeTracker() {
 
   const exitImageInputRef = useRef<HTMLInputElement>(null);
 
-  const handleExitImagePaste = (e: React.ClipboardEvent) => {
+  const handleExitImagePaste = async (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
 
@@ -434,9 +444,10 @@ export function TradeTracker() {
         const file = item.getAsFile();
         if (file) {
           const reader = new FileReader();
-          reader.onload = (event) => {
+          reader.onload = async (event) => {
             const base64 = event.target?.result as string;
-            setFormData({ ...formData, exit_image_url: base64 });
+            const compressed = await compressImage(base64);
+            setFormData({ ...formData, exit_image_url: compressed });
           };
           reader.readAsDataURL(file);
         }
@@ -449,9 +460,10 @@ export function TradeTracker() {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         const base64 = event.target?.result as string;
-        setFormData({ ...formData, exit_image_url: base64 });
+        const compressed = await compressImage(base64);
+        setFormData({ ...formData, exit_image_url: compressed });
       };
       reader.readAsDataURL(file);
     }
