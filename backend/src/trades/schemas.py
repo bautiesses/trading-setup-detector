@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -14,6 +14,7 @@ class TradeCreate(BaseModel):
     image_url: Optional[str] = None
     timeframe: Optional[str] = None
     strategy: Optional[str] = None
+    confidence_level: Optional[int] = Field(None, ge=1, le=5)
     entry_date: Optional[datetime] = None
 
 
@@ -37,6 +38,7 @@ class TradeUpdate(BaseModel):
     review_image_url: Optional[str] = None
     timeframe: Optional[str] = None
     strategy: Optional[str] = None
+    confidence_level: Optional[int] = Field(None, ge=1, le=5)
     exit_date: Optional[datetime] = None
 
 
@@ -73,6 +75,7 @@ class TradeResponse(BaseModel):
     review_image_url: Optional[str]
     timeframe: Optional[str]
     strategy: Optional[str]
+    confidence_level: Optional[int]
     entry_date: datetime
     exit_date: Optional[datetime]
     created_at: datetime
@@ -95,3 +98,21 @@ class TradeStatsResponse(BaseModel):
     average_pnl: float
     best_trade: float
     worst_trade: float
+
+
+class AnalyzeMonthRequest(BaseModel):
+    month: int = Field(..., ge=1, le=12)
+    year: int = Field(..., ge=2020, le=2100)
+
+
+class AnalyzeMonthResponse(BaseModel):
+    success: bool
+    month: Optional[int] = None
+    year: Optional[int] = None
+    total_trades: Optional[int] = None
+    winning_trades: Optional[int] = None
+    losing_trades: Optional[int] = None
+    win_rate: Optional[float] = None
+    images_analyzed: Optional[int] = None
+    analysis: Optional[str] = None
+    error: Optional[str] = None

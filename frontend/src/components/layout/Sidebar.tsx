@@ -9,7 +9,8 @@ import {
   ScanSearch,
   LineChart,
   LogOut,
-  Wallet
+  Wallet,
+  Brain
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
@@ -19,6 +20,7 @@ const navItems = [
   { href: '/watchlist', label: 'Watchlist', icon: List },
   { href: '/scanner', label: 'Scanner', icon: ScanSearch },
   { href: '/trades', label: 'Trades', icon: LineChart },
+  { href: '/analytics', label: 'Analytics IA', icon: Brain },
   { href: '/solana', label: 'Solana', icon: Wallet },
 ];
 

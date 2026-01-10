@@ -53,6 +53,7 @@ class Trade(Base):
     # Timeframe & Strategy
     timeframe = Column(String(10), nullable=True)
     strategy = Column(String(100), nullable=True)  # e.g., "Break & Retest"
+    confidence_level = Column(Integer, nullable=True)  # 1-5 trader confidence
 
     # Dates
     entry_date = Column(DateTime(timezone=True), server_default=func.now())

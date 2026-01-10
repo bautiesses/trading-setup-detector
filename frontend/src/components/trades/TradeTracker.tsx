@@ -30,6 +30,7 @@ import {
   ChevronRight,
   Pencil,
   PenTool,
+  Star,
 } from 'lucide-react';
 
 interface Trade {
@@ -53,6 +54,7 @@ interface Trade {
   review_image_url: string | null;
   timeframe: string | null;
   strategy: string | null;
+  confidence_level: number | null;
   entry_date: string;
   exit_date: string | null;
 }
@@ -106,6 +108,7 @@ export function TradeTracker() {
     image_url: '',
     timeframe: '1h',
     strategy: 'Break & Retest',
+    confidence_level: 3,
     entry_date: getTodayDate(),
     // Exit fields (for editing closed trades)
     exit_price: '',
@@ -170,6 +173,7 @@ export function TradeTracker() {
       image_url: '',
       timeframe: '1h',
       strategy: 'Break & Retest',
+      confidence_level: 3,
       entry_date: getTodayDate(),
       exit_price: '',
       exit_notes: '',
@@ -192,6 +196,7 @@ export function TradeTracker() {
       image_url: trade.image_url || '',
       timeframe: trade.timeframe || '1h',
       strategy: trade.strategy || 'Break & Retest',
+      confidence_level: trade.confidence_level || 3,
       entry_date: trade.entry_date ? new Date(trade.entry_date).toISOString().slice(0, 16) : getTodayDate(),
       // Exit fields
       exit_price: trade.exit_price?.toString() || '',
@@ -218,6 +223,7 @@ export function TradeTracker() {
         image_url: formData.image_url || undefined,
         timeframe: formData.timeframe || undefined,
         strategy: formData.strategy || undefined,
+        confidence_level: formData.confidence_level,
         entry_date: formData.entry_date ? new Date(formData.entry_date).toISOString() : undefined,
       };
 
@@ -533,7 +539,18 @@ export function TradeTracker() {
       </div>
 
       {/* Stats Row - 4 columns */}
-      {stats && stats.total_trades > 0 && (
+      {loading ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map(i => (
+            <Card key={i} className="bg-zinc-900/50">
+              <CardContent className="p-3">
+                <div className="h-3 w-16 bg-zinc-800 rounded animate-pulse mb-2" />
+                <div className="h-6 w-20 bg-zinc-800 rounded animate-pulse" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : stats && stats.total_trades > 0 ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card className="bg-zinc-900/50">
             <CardContent className="p-3">
@@ -571,7 +588,7 @@ export function TradeTracker() {
             </CardContent>
           </Card>
         </div>
-      )}
+      ) : null}
 
       {/* New/Edit Trade Form */}
       {showForm && (
@@ -684,6 +701,36 @@ export function TradeTracker() {
                     placeholder="Break & Retest"
                     className="bg-zinc-800 border-zinc-700"
                   />
+                </div>
+              </div>
+
+              {/* Confidence Level */}
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Nivel de Confianza</label>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, confidence_level: level })}
+                      className="p-1 transition-colors"
+                    >
+                      <Star
+                        className={`h-6 w-6 ${
+                          level <= formData.confidence_level
+                            ? 'fill-yellow-400 text-yellow-400'
+                            : 'text-zinc-600 hover:text-zinc-400'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  <span className="ml-2 text-sm text-zinc-400">
+                    {formData.confidence_level === 1 && 'Muy baja'}
+                    {formData.confidence_level === 2 && 'Baja'}
+                    {formData.confidence_level === 3 && 'Media'}
+                    {formData.confidence_level === 4 && 'Alta'}
+                    {formData.confidence_level === 5 && 'Muy alta'}
+                  </span>
                 </div>
               </div>
 
@@ -890,7 +937,30 @@ export function TradeTracker() {
         {/* Trades List */}
         <div className="flex-1">
           {loading ? (
-            <div className="py-8" />
+            <div className="space-y-2">
+              {[1, 2, 3, 4].map(i => (
+                <Card key={i} className="border-l-4 border-l-zinc-700">
+                  <CardContent className="py-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded bg-zinc-800 w-8 h-8 animate-pulse" />
+                        <div>
+                          <div className="h-5 w-24 bg-zinc-800 rounded animate-pulse mb-1" />
+                          <div className="h-3 w-40 bg-zinc-800 rounded animate-pulse" />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="h-5 w-16 bg-zinc-800 rounded animate-pulse mb-1" />
+                          <div className="h-3 w-12 bg-zinc-800 rounded animate-pulse" />
+                        </div>
+                        <div className="h-3 w-16 bg-zinc-800 rounded animate-pulse" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           ) : trades.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center">
@@ -982,6 +1052,23 @@ export function TradeTracker() {
                         <div>
                           <span className="text-zinc-400">Exit:</span>
                           <span className="ml-2 text-white">${formatPrice(trade.exit_price)}</span>
+                        </div>
+                      )}
+                      {trade.confidence_level && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-zinc-400">Confianza:</span>
+                          <div className="flex ml-1">
+                            {[1, 2, 3, 4, 5].map((level) => (
+                              <Star
+                                key={level}
+                                className={`h-3 w-3 ${
+                                  level <= trade.confidence_level!
+                                    ? 'fill-yellow-400 text-yellow-400'
+                                    : 'text-zinc-700'
+                                }`}
+                              />
+                            ))}
+                          </div>
                         </div>
                       )}
                       {trade.timeframe && (

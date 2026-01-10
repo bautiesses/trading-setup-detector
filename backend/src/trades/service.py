@@ -4,8 +4,9 @@ Trade Service - CRUD operations for trades
 
 from typing import List, Optional
 from datetime import datetime
+from calendar import monthrange
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, and_
 
 from src.trades.models import Trade
 from src.trades.schemas import TradeCreate, TradeUpdate, TradeClose, TradeReview
@@ -30,6 +31,7 @@ class TradeService:
             image_url=data.image_url,
             timeframe=data.timeframe,
             strategy=data.strategy,
+            confidence_level=data.confidence_level,
             entry_date=data.entry_date or datetime.now(),
         )
         self.db.add(trade)
@@ -188,3 +190,22 @@ class TradeService:
             "best_trade": max(pnls) if pnls else 0,
             "worst_trade": min(pnls) if pnls else 0,
         }
+
+    async def get_trades_by_month(self, user_id: int, month: int, year: int) -> List[Trade]:
+        """Get all closed trades for a specific month"""
+        # Get first and last day of the month
+        first_day = datetime(year, month, 1)
+        last_day_num = monthrange(year, month)[1]
+        last_day = datetime(year, month, last_day_num, 23, 59, 59)
+
+        result = await self.db.execute(
+            select(Trade).where(
+                and_(
+                    Trade.user_id == user_id,
+                    Trade.status == "closed",
+                    Trade.exit_date >= first_day,
+                    Trade.exit_date <= last_day
+                )
+            ).order_by(desc(Trade.exit_date))
+        )
+        return list(result.scalars().all())

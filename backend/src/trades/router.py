@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
+import os
 
 from src.database import get_db
 from src.auth.dependencies import get_current_active_user
@@ -14,7 +15,10 @@ from src.trades.schemas import (
     TradeResponse,
     TradesListResponse,
     TradeStatsResponse,
+    AnalyzeMonthRequest,
+    AnalyzeMonthResponse,
 )
+from src.trades.ai_analyzer import AITradeAnalyzer, TradeForAnalysis
 
 router = APIRouter(prefix="/trades", tags=["Trades"])
 
@@ -130,3 +134,58 @@ async def delete_trade(
     if not deleted:
         raise HTTPException(status_code=404, detail="Trade not found")
     return {"success": True, "message": "Trade deleted"}
+
+
+@router.post("/analyze-month", response_model=AnalyzeMonthResponse)
+async def analyze_month(
+    data: AnalyzeMonthRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Analyze trades for a specific month using AI"""
+    # Check if API key is configured
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        return AnalyzeMonthResponse(
+            success=False,
+            error="ANTHROPIC_API_KEY no está configurada en el servidor"
+        )
+
+    service = TradeService(db)
+    trades = await service.get_trades_by_month(current_user.id, data.month, data.year)
+
+    if not trades:
+        return AnalyzeMonthResponse(
+            success=False,
+            error=f"No hay trades cerrados en {data.month}/{data.year}"
+        )
+
+    # Convert to TradeForAnalysis format
+    trades_for_analysis = [
+        TradeForAnalysis(
+            id=t.id,
+            symbol=t.symbol,
+            side=t.side,
+            entry_price=t.entry_price,
+            exit_price=t.exit_price,
+            pnl=t.pnl,
+            pnl_percent=t.pnl_percent,
+            strategy=t.strategy,
+            timeframe=t.timeframe,
+            confidence_level=t.confidence_level,
+            image_url=t.image_url,
+            exit_image_url=t.exit_image_url,
+            notes=t.notes,
+            exit_notes=t.exit_notes,
+        )
+        for t in trades
+    ]
+
+    # Analyze with AI
+    try:
+        analyzer = AITradeAnalyzer()
+        result = await analyzer.analyze_trades(trades_for_analysis, data.month, data.year)
+        return AnalyzeMonthResponse(**result)
+    except ValueError as e:
+        return AnalyzeMonthResponse(success=False, error=str(e))
+    except Exception as e:
+        return AnalyzeMonthResponse(success=False, error=f"Error al analizar: {str(e)}")

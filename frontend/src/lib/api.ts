@@ -250,11 +250,26 @@ class ApiClient {
 
   // Trades
   async getTrades(status?: string, skip = 0, limit = 50) {
+    const cacheKey = `trades_${status || 'all'}_${skip}_${limit}`;
+    const cached = this.getCache(cacheKey, 30 * 1000); // 30 sec cache
+    if (cached) return cached;
+
     let url = `/trades/?skip=${skip}&limit=${limit}`;
     if (status) {
       url += `&status=${status}`;
     }
-    return this.request(url);
+    const data = await this.request(url);
+    this.setCache(cacheKey, data);
+    return data;
+  }
+
+  clearTradesCache() {
+    // Clear all trades cache entries
+    for (const key of cache.keys()) {
+      if (key.startsWith('trades_') || key === 'trade_stats') {
+        cache.delete(key);
+      }
+    }
   }
 
   async createTrade(data: {
@@ -269,39 +284,62 @@ class ApiClient {
     timeframe?: string;
     strategy?: string;
   }) {
-    return this.request('/trades/', {
+    const result = await this.request('/trades/', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    this.clearTradesCache();
+    return result;
   }
 
   async updateTrade(id: number, data: Record<string, unknown>) {
-    return this.request(`/trades/${id}`, {
+    const result = await this.request(`/trades/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+    this.clearTradesCache();
+    return result;
   }
 
   async closeTrade(id: number, data: { exit_price: number; fees?: number; exit_notes?: string; exit_image_url?: string }) {
-    return this.request(`/trades/${id}/close`, {
+    const result = await this.request(`/trades/${id}/close`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    this.clearTradesCache();
+    return result;
   }
 
   async addTradeReview(id: number, data: { review_notes?: string; review_image_url?: string }) {
-    return this.request(`/trades/${id}/review`, {
+    const result = await this.request(`/trades/${id}/review`, {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    this.clearTradesCache();
+    return result;
   }
 
   async deleteTrade(id: number) {
-    return this.request(`/trades/${id}`, { method: 'DELETE' });
+    const result = await this.request(`/trades/${id}`, { method: 'DELETE' });
+    this.clearTradesCache();
+    return result;
   }
 
   async getTradeStats() {
-    return this.request('/trades/stats');
+    const cacheKey = 'trade_stats';
+    const cached = this.getCache(cacheKey, 30 * 1000); // 30 sec cache
+    if (cached) return cached;
+
+    const data = await this.request('/trades/stats');
+    this.setCache(cacheKey, data);
+    return data;
+  }
+
+  async analyzeMonth(month: number, year: number) {
+    return this.request('/trades/analyze-month', {
+      method: 'POST',
+      body: JSON.stringify({ month, year }),
+    });
   }
 
   // ========== SOLANA ==========
