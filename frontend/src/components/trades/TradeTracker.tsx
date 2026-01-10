@@ -114,6 +114,7 @@ export function TradeTracker() {
     exit_price: '',
     exit_notes: '',
     exit_image_url: '',
+    exit_date: '',
     fees: '',
   });
 
@@ -179,6 +180,7 @@ export function TradeTracker() {
       exit_price: '',
       exit_notes: '',
       exit_image_url: '',
+      exit_date: '',
       fees: '',
     });
     setEditingTrade(null);
@@ -203,11 +205,12 @@ export function TradeTracker() {
       exit_price: trade.exit_price?.toString() || '',
       exit_notes: trade.exit_notes || '',
       exit_image_url: trade.exit_image_url || '',
+      exit_date: trade.exit_date ? new Date(trade.exit_date).toISOString().slice(0, 16) : '',
       fees: trade.fees?.toString() || '',
     });
     setEditingTrade(trade);
-    setShowForm(true);
-    setExpandedTrade(null);
+    setShowForm(false); // Don't show form at top - it will appear inline
+    setExpandedTrade(trade.id); // Keep the trade expanded
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -235,6 +238,7 @@ export function TradeTracker() {
           exit_price: formData.exit_price ? parseFloat(formData.exit_price) : undefined,
           exit_notes: formData.exit_notes || undefined,
           exit_image_url: formData.exit_image_url || undefined,
+          exit_date: formData.exit_date ? new Date(formData.exit_date).toISOString() : undefined,
           fees: formData.fees ? parseFloat(formData.fees) : undefined,
         } : baseTradeData;
         await api.updateTrade(editingTrade.id, updateData);
@@ -592,14 +596,12 @@ export function TradeTracker() {
         </div>
       ) : null}
 
-      {/* New/Edit Trade Form */}
-      {showForm && (
-        <Card className={editingTrade ? "border-yellow-500/50" : "border-emerald-500/50"}>
+      {/* New Trade Form - only shows at top for NEW trades */}
+      {showForm && !editingTrade && (
+        <Card className="border-emerald-500/50">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">
-                {editingTrade ? 'Editar Trade' : 'Nuevo Trade'}
-              </h3>
+              <h3 className="text-lg font-semibold text-white">Nuevo Trade</h3>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -806,7 +808,7 @@ export function TradeTracker() {
                 <div className="border-t border-zinc-700 pt-4 mt-4 space-y-4">
                   <h4 className="text-md font-semibold text-white">📉 Datos del Cierre</h4>
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div>
                       <label className="text-xs text-zinc-400">Exit Price</label>
                       <Input
@@ -826,6 +828,15 @@ export function TradeTracker() {
                         value={formData.fees}
                         onChange={(e) => setFormData({ ...formData, fees: e.target.value })}
                         placeholder="0"
+                        className="bg-zinc-800 border-zinc-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-zinc-400">Fecha de Cierre</label>
+                      <Input
+                        type="datetime-local"
+                        value={formData.exit_date}
+                        onChange={(e) => setFormData({ ...formData, exit_date: e.target.value })}
                         className="bg-zinc-800 border-zinc-700"
                       />
                     </div>
@@ -904,7 +915,7 @@ export function TradeTracker() {
                 </Button>
                 <Button type="submit">
                   <Check className="mr-2 h-4 w-4" />
-                  {editingTrade ? 'Guardar Cambios' : 'Guardar Trade'}
+                  Guardar Trade
                 </Button>
               </div>
             </form>
@@ -1036,7 +1047,8 @@ export function TradeTracker() {
                 {/* Expanded content */}
                 {expandedTrade === trade.id && (
                   <div className="mt-4 pt-4 border-t border-zinc-800 space-y-3">
-                    {/* Trade details */}
+                    {/* Trade details - hide when editing */}
+                    {editingTrade?.id !== trade.id && (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       {trade.stop_loss && (
                         <div>
@@ -1080,9 +1092,10 @@ export function TradeTracker() {
                         </div>
                       )}
                     </div>
+                    )}
 
-                    {/* Images & Notes - Side by Side */}
-                    {(trade.image_url || trade.exit_image_url || trade.notes || trade.exit_notes) && (
+                    {/* Images & Notes - Side by Side - hide when editing */}
+                    {editingTrade?.id !== trade.id && (trade.image_url || trade.exit_image_url || trade.notes || trade.exit_notes) && (
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Entry Column */}
                         <div className="space-y-2">
@@ -1134,8 +1147,8 @@ export function TradeTracker() {
                       </div>
                     )}
 
-                    {/* Review Section */}
-                    {(trade.review_image_url || trade.review_notes) && (
+                    {/* Review Section - hide when editing this trade */}
+                    {editingTrade?.id !== trade.id && (trade.review_image_url || trade.review_notes) && (
                       <div className="border-t border-zinc-700 pt-3 mt-3">
                         <div className="text-xs text-zinc-500 mb-2">🔍 Review Post-Cierre</div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1159,7 +1172,216 @@ export function TradeTracker() {
                       </div>
                     )}
 
-                    {/* Actions */}
+                    {/* Inline Edit Form */}
+                    {editingTrade?.id === trade.id && (
+                      <div className="border-t border-yellow-500/50 pt-4 mt-3">
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-md font-semibold text-yellow-400">✏️ Editando Trade</h4>
+                          </div>
+
+                          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                            <div>
+                              <label className="text-xs text-zinc-400">Símbolo</label>
+                              <Input
+                                value={formData.symbol}
+                                onChange={(e) => setFormData({ ...formData, symbol: e.target.value })}
+                                placeholder="BTCUSDT"
+                                required
+                                className="bg-zinc-800 border-zinc-700"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-zinc-400">Lado</label>
+                              <select
+                                value={formData.side}
+                                onChange={(e) => setFormData({ ...formData, side: e.target.value })}
+                                className="w-full bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-md px-3 py-2 text-sm"
+                              >
+                                <option value="long">Long</option>
+                                <option value="short">Short</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs text-zinc-400">Entry Price</label>
+                              <Input
+                                type="number"
+                                step="any"
+                                value={formData.entry_price}
+                                onChange={(e) => setFormData({ ...formData, entry_price: e.target.value })}
+                                placeholder="50000"
+                                required
+                                className="bg-zinc-800 border-zinc-700"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-zinc-400">Size (USD)</label>
+                              <Input
+                                type="number"
+                                step="any"
+                                value={formData.size}
+                                onChange={(e) => setFormData({ ...formData, size: e.target.value })}
+                                placeholder="100"
+                                required
+                                className="bg-zinc-800 border-zinc-700"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-zinc-400">Fecha Entrada</label>
+                              <Input
+                                type="datetime-local"
+                                value={formData.entry_date}
+                                onChange={(e) => setFormData({ ...formData, entry_date: e.target.value })}
+                                className="bg-zinc-800 border-zinc-700"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div>
+                              <label className="text-xs text-zinc-400">Stop Loss</label>
+                              <Input
+                                type="number"
+                                step="any"
+                                value={formData.stop_loss}
+                                onChange={(e) => setFormData({ ...formData, stop_loss: e.target.value })}
+                                placeholder="49000"
+                                className="bg-zinc-800 border-zinc-700"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-zinc-400">Take Profit</label>
+                              <Input
+                                type="number"
+                                step="any"
+                                value={formData.take_profit}
+                                onChange={(e) => setFormData({ ...formData, take_profit: e.target.value })}
+                                placeholder="52000"
+                                className="bg-zinc-800 border-zinc-700"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-zinc-400">Timeframe</label>
+                              <select
+                                value={formData.timeframe}
+                                onChange={(e) => setFormData({ ...formData, timeframe: e.target.value })}
+                                className="w-full bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-md px-3 py-2 text-sm"
+                              >
+                                <option value="15m">15m</option>
+                                <option value="1h">1h</option>
+                                <option value="4h">4h</option>
+                                <option value="1d">1d</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs text-zinc-400">Estrategia</label>
+                              <Input
+                                value={formData.strategy}
+                                onChange={(e) => setFormData({ ...formData, strategy: e.target.value })}
+                                placeholder="Break & Retest"
+                                className="bg-zinc-800 border-zinc-700"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Confidence Level */}
+                          <div>
+                            <label className="text-xs text-zinc-400 mb-1 block">Nivel de Confianza</label>
+                            <div className="flex items-center gap-1">
+                              {[1, 2, 3, 4, 5].map((level) => (
+                                <button
+                                  key={level}
+                                  type="button"
+                                  onClick={() => setFormData({ ...formData, confidence_level: level })}
+                                  className="p-1 transition-colors"
+                                >
+                                  <Star
+                                    className={`h-5 w-5 ${
+                                      level <= formData.confidence_level
+                                        ? 'fill-yellow-400 text-yellow-400'
+                                        : 'text-zinc-600 hover:text-zinc-400'
+                                    }`}
+                                  />
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Entry Notes */}
+                          <div>
+                            <label className="text-xs text-zinc-400">Notas de entrada</label>
+                            <textarea
+                              value={formData.notes}
+                              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                              placeholder="Análisis, razón del trade..."
+                              className="w-full bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-md px-3 py-2 text-sm min-h-[60px]"
+                            />
+                          </div>
+
+                          {/* Exit section - only show for closed trades */}
+                          {editingTrade.status === 'closed' && (
+                            <div className="border-t border-zinc-700 pt-4 space-y-3">
+                              <h5 className="text-sm font-semibold text-zinc-300">📉 Datos del Cierre</h5>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div>
+                                  <label className="text-xs text-zinc-400">Exit Price</label>
+                                  <Input
+                                    type="number"
+                                    step="any"
+                                    value={formData.exit_price}
+                                    onChange={(e) => setFormData({ ...formData, exit_price: e.target.value })}
+                                    placeholder="51000"
+                                    className="bg-zinc-800 border-zinc-700"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-xs text-zinc-400">Fees</label>
+                                  <Input
+                                    type="number"
+                                    step="any"
+                                    value={formData.fees}
+                                    onChange={(e) => setFormData({ ...formData, fees: e.target.value })}
+                                    placeholder="0"
+                                    className="bg-zinc-800 border-zinc-700"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-xs text-zinc-400">Fecha de Cierre</label>
+                                  <Input
+                                    type="datetime-local"
+                                    value={formData.exit_date}
+                                    onChange={(e) => setFormData({ ...formData, exit_date: e.target.value })}
+                                    className="bg-zinc-800 border-zinc-700"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="text-xs text-zinc-400">Notas de cierre</label>
+                                <textarea
+                                  value={formData.exit_notes}
+                                  onChange={(e) => setFormData({ ...formData, exit_notes: e.target.value })}
+                                  placeholder="Razón del cierre..."
+                                  className="w-full bg-zinc-800 border border-zinc-700 text-zinc-100 rounded-md px-3 py-2 text-sm min-h-[60px]"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex justify-end gap-2 pt-2">
+                            <Button type="button" variant="outline" size="sm" onClick={resetForm}>
+                              Cancelar
+                            </Button>
+                            <Button type="submit" size="sm">
+                              <Check className="mr-2 h-4 w-4" />
+                              Guardar Cambios
+                            </Button>
+                          </div>
+                        </form>
+                      </div>
+                    )}
+
+                    {/* Actions - hide when editing this trade */}
+                    {editingTrade?.id !== trade.id && (
                     <div className="flex gap-2">
                       {trade.status === 'open' && (
                         <>
@@ -1353,6 +1575,7 @@ export function TradeTracker() {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
+                    )}
                   </div>
                 )}
               </CardContent>
