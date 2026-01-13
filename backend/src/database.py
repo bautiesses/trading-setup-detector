@@ -44,6 +44,11 @@ async def get_db():
 
 async def init_db():
     """Initialize database and create all tables"""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    print("Database initialized - all tables created/verified")
+    try:
+        print("Initializing database...", flush=True)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("Database initialized - all tables created/verified", flush=True)
+    except Exception as e:
+        print(f"DATABASE ERROR: Failed to initialize database: {e}", flush=True)
+        raise
