@@ -7,6 +7,9 @@ settings = get_settings()
 # Use async_database_url which converts postgres:// to postgresql+asyncpg://
 database_url = settings.async_database_url
 
+# Debug: show which database we're connecting to
+print(f"DATABASE CONFIG: Using database URL: {database_url[:50]}..." if len(database_url) > 50 else f"DATABASE CONFIG: Using database URL: {database_url}")
+
 # Adjust pool settings based on database type
 is_sqlite = database_url.startswith("sqlite")
 
