@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
-import { Brain, TrendingUp, TrendingDown, Calendar, Loader2, ChevronDown, ChevronUp, Trash2, Save } from 'lucide-react';
+import { Brain, Calendar, Loader2, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 
 interface AnalysisResult {
   success: boolean;
@@ -43,7 +43,6 @@ export default function AnalyticsPage() {
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [savedAnalyses, setSavedAnalyses] = useState<SavedAnalysis[]>([]);
   const [expandedAnalysis, setExpandedAnalysis] = useState<number | null>(null);
@@ -67,10 +66,33 @@ export default function AnalyticsPage() {
 
   const handleAnalyze = async () => {
     setLoading(true);
-    setResult(null);
     try {
       const data = await api.analyzeMonth(selectedMonth, selectedYear) as AnalysisResult;
-      setResult(data);
+
+      // Si el análisis fue exitoso, guardarlo automáticamente
+      if (data.success && data.analysis) {
+        await api.saveMonthlyAnalysis({
+          month: data.month!,
+          year: data.year!,
+          total_trades: data.total_trades || 0,
+          winning_trades: data.winning_trades || 0,
+          losing_trades: data.losing_trades || 0,
+          win_rate: data.win_rate || 0,
+          total_pnl: 0,
+          analysis_text: data.analysis,
+          images_analyzed: data.images_analyzed || 0,
+        });
+        await loadSavedAnalyses();
+        // Expandir el análisis recién creado
+        const newAnalyses = await api.getMonthlyAnalyses() as { analyses: SavedAnalysis[]; total: number };
+        const justSaved = newAnalyses.analyses.find(a => a.month === data.month && a.year === data.year);
+        if (justSaved) {
+          setExpandedAnalysis(justSaved.id);
+        }
+      } else {
+        // Solo mostrar error si falló
+        setResult(data);
+      }
     } catch (error) {
       setResult({
         success: false,
@@ -78,31 +100,6 @@ export default function AnalyticsPage() {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSaveAnalysis = async () => {
-    if (!result || !result.success || !result.analysis) return;
-
-    setSaving(true);
-    try {
-      await api.saveMonthlyAnalysis({
-        month: result.month!,
-        year: result.year!,
-        total_trades: result.total_trades || 0,
-        winning_trades: result.winning_trades || 0,
-        losing_trades: result.losing_trades || 0,
-        win_rate: result.win_rate || 0,
-        total_pnl: 0, // TODO: Get from stats
-        analysis_text: result.analysis,
-        images_analyzed: result.images_analyzed || 0,
-      });
-      await loadSavedAnalyses();
-      setResult(null); // Clear current result after saving
-    } catch (error) {
-      console.error('Error saving analysis:', error);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -190,94 +187,13 @@ export default function AnalyticsPage() {
         </CardContent>
       </Card>
 
-      {/* Current Analysis Result */}
-      {result && (
-        <>
-          {result.success ? (
-            <>
-              {/* Stats Summary */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card className="bg-zinc-900/50">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-zinc-500 mb-1">Total Trades</p>
-                    <p className="text-2xl font-bold text-white">{result.total_trades}</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-zinc-900/50">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-zinc-500 mb-1">Ganadores</p>
-                    <p className="text-2xl font-bold text-green-400 flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5" />
-                      {result.winning_trades}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-zinc-900/50">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-zinc-500 mb-1">Perdedores</p>
-                    <p className="text-2xl font-bold text-red-400 flex items-center gap-2">
-                      <TrendingDown className="h-5 w-5" />
-                      {result.losing_trades}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-zinc-900/50">
-                  <CardContent className="p-4">
-                    <p className="text-xs text-zinc-500 mb-1">Win Rate</p>
-                    <p className={`text-2xl font-bold ${(result.win_rate || 0) >= 50 ? 'text-green-400' : 'text-red-400'}`}>
-                      {result.win_rate?.toFixed(1)}%
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* AI Analysis with Save Button */}
-              <Card className="border-purple-500/30">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2 text-purple-400">
-                      <Brain className="h-5 w-5" />
-                      Análisis de Claude - {MONTHS[result.month! - 1]} {result.year}
-                      {result.images_analyzed && result.images_analyzed > 0 && (
-                        <span className="text-xs text-zinc-500 font-normal ml-2">
-                          ({result.images_analyzed} imágenes analizadas)
-                        </span>
-                      )}
-                    </CardTitle>
-                    <Button
-                      onClick={handleSaveAnalysis}
-                      disabled={saving}
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      {saving ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <>
-                          <Save className="mr-2 h-4 w-4" />
-                          Guardar
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="prose prose-invert prose-sm max-w-none">
-                    <div className="whitespace-pre-wrap text-zinc-300 leading-relaxed">
-                      {result.analysis}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          ) : (
-            <Card className="border-red-500/30">
-              <CardContent className="py-8 text-center">
-                <p className="text-red-400">{result.error}</p>
-              </CardContent>
-            </Card>
-          )}
-        </>
+      {/* Error Display */}
+      {result && !result.success && (
+        <Card className="border-red-500/30">
+          <CardContent className="py-8 text-center">
+            <p className="text-red-400">{result.error}</p>
+          </CardContent>
+        </Card>
       )}
 
       {/* Saved Analyses */}
