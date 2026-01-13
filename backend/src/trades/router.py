@@ -66,6 +66,62 @@ async def get_trade_stats(
     return stats
 
 
+# Monthly Analysis endpoints - MUST be before /{trade_id} route!
+@router.post("/analyses", response_model=MonthlyAnalysisResponse)
+async def save_monthly_analysis(
+    data: MonthlyAnalysisCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Save a monthly analysis"""
+    service = TradeService(db)
+    analysis = await service.save_monthly_analysis(current_user.id, data)
+    return analysis
+
+
+@router.get("/analyses")
+async def get_monthly_analyses(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get all saved monthly analyses"""
+    service = TradeService(db)
+    analyses, total = await service.get_all_monthly_analyses(current_user.id)
+
+    # Return data with proper serialization
+    result = []
+    for a in analyses:
+        result.append({
+            "id": a.id,
+            "month": a.month,
+            "year": a.year,
+            "total_trades": a.total_trades,
+            "winning_trades": a.winning_trades,
+            "losing_trades": a.losing_trades,
+            "win_rate": a.win_rate,
+            "total_pnl": a.total_pnl,
+            "analysis_text": a.analysis_text,
+            "images_analyzed": a.images_analyzed,
+            "created_at": str(a.created_at) if a.created_at else None,
+        })
+
+    return {"analyses": result, "total": total}
+
+
+@router.delete("/analyses/{analysis_id}")
+async def delete_monthly_analysis(
+    analysis_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Delete a monthly analysis"""
+    service = TradeService(db)
+    deleted = await service.delete_monthly_analysis(current_user.id, analysis_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return {"success": True, "message": "Analysis deleted"}
+
+
 @router.get("/{trade_id}", response_model=TradeResponse)
 async def get_trade(
     trade_id: int,
@@ -192,60 +248,3 @@ async def analyze_month(
         return AnalyzeMonthResponse(success=False, error=str(e))
     except Exception as e:
         return AnalyzeMonthResponse(success=False, error=f"Error al analizar: {str(e)}")
-
-
-# Monthly Analysis endpoints (saved analyses)
-@router.post("/analyses", response_model=MonthlyAnalysisResponse)
-async def save_monthly_analysis(
-    data: MonthlyAnalysisCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-):
-    """Save a monthly analysis"""
-    service = TradeService(db)
-    analysis = await service.save_monthly_analysis(current_user.id, data)
-    return analysis
-
-
-@router.get("/analyses")
-async def get_monthly_analyses(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-):
-    """Get all saved monthly analyses"""
-    service = TradeService(db)
-    analyses, total = await service.get_all_monthly_analyses(current_user.id)
-
-    # Debug: return raw data to see what's in the database
-    result = []
-    for a in analyses:
-        result.append({
-            "id": a.id,
-            "month": a.month,
-            "year": a.year,
-            "total_trades": a.total_trades,
-            "winning_trades": a.winning_trades,
-            "losing_trades": a.losing_trades,
-            "win_rate": a.win_rate,
-            "total_pnl": a.total_pnl,
-            "analysis_text": a.analysis_text[:100] if a.analysis_text else None,  # Truncate for logs
-            "images_analyzed": a.images_analyzed,
-            "created_at": str(a.created_at) if a.created_at else None,
-        })
-    print(f"Raw analyses data: {result}")
-
-    return {"analyses": result, "total": total}
-
-
-@router.delete("/analyses/{analysis_id}")
-async def delete_monthly_analysis(
-    analysis_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
-):
-    """Delete a monthly analysis"""
-    service = TradeService(db)
-    deleted = await service.delete_monthly_analysis(current_user.id, analysis_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Analysis not found")
-    return {"success": True, "message": "Analysis deleted"}
