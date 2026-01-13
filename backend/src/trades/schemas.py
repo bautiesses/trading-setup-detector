@@ -117,3 +117,38 @@ class AnalyzeMonthResponse(BaseModel):
     images_analyzed: Optional[int] = None
     analysis: Optional[str] = None
     error: Optional[str] = None
+
+
+# Monthly Analysis (saved)
+class MonthlyAnalysisCreate(BaseModel):
+    month: int = Field(..., ge=1, le=12)
+    year: int = Field(..., ge=2020, le=2100)
+    total_trades: int = 0
+    winning_trades: int = 0
+    losing_trades: int = 0
+    win_rate: float = 0
+    total_pnl: float = 0
+    analysis_text: str
+    images_analyzed: int = 0
+
+
+class MonthlyAnalysisResponse(BaseModel):
+    id: int
+    month: int
+    year: int
+    total_trades: int
+    winning_trades: int
+    losing_trades: int
+    win_rate: float
+    total_pnl: float
+    analysis_text: str
+    images_analyzed: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MonthlyAnalysisListResponse(BaseModel):
+    analyses: List[MonthlyAnalysisResponse]
+    total: int

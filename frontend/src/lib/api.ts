@@ -342,6 +342,32 @@ class ApiClient {
     });
   }
 
+  // Saved Monthly Analyses
+  async saveMonthlyAnalysis(data: {
+    month: number;
+    year: number;
+    total_trades: number;
+    winning_trades: number;
+    losing_trades: number;
+    win_rate: number;
+    total_pnl: number;
+    analysis_text: string;
+    images_analyzed: number;
+  }) {
+    return this.request('/trades/analyses', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getMonthlyAnalyses() {
+    return this.request('/trades/analyses');
+  }
+
+  async deleteMonthlyAnalysis(analysisId: number) {
+    return this.request(`/trades/analyses/${analysisId}`, { method: 'DELETE' });
+  }
+
   // ========== SOLANA ==========
 
   // Wallets

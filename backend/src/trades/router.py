@@ -17,6 +17,9 @@ from src.trades.schemas import (
     TradeStatsResponse,
     AnalyzeMonthRequest,
     AnalyzeMonthResponse,
+    MonthlyAnalysisCreate,
+    MonthlyAnalysisResponse,
+    MonthlyAnalysisListResponse,
 )
 from src.trades.ai_analyzer import AITradeAnalyzer, TradeForAnalysis
 
@@ -189,3 +192,44 @@ async def analyze_month(
         return AnalyzeMonthResponse(success=False, error=str(e))
     except Exception as e:
         return AnalyzeMonthResponse(success=False, error=f"Error al analizar: {str(e)}")
+
+
+# Monthly Analysis endpoints (saved analyses)
+@router.post("/analyses", response_model=MonthlyAnalysisResponse)
+async def save_monthly_analysis(
+    data: MonthlyAnalysisCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Save a monthly analysis"""
+    service = TradeService(db)
+    analysis = await service.save_monthly_analysis(current_user.id, data)
+    return analysis
+
+
+@router.get("/analyses", response_model=MonthlyAnalysisListResponse)
+async def get_monthly_analyses(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get all saved monthly analyses"""
+    service = TradeService(db)
+    analyses, total = await service.get_all_monthly_analyses(current_user.id)
+    return MonthlyAnalysisListResponse(
+        analyses=[MonthlyAnalysisResponse.model_validate(a) for a in analyses],
+        total=total
+    )
+
+
+@router.delete("/analyses/{analysis_id}")
+async def delete_monthly_analysis(
+    analysis_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Delete a monthly analysis"""
+    service = TradeService(db)
+    deleted = await service.delete_monthly_analysis(current_user.id, analysis_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return {"success": True, "message": "Analysis deleted"}

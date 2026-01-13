@@ -8,8 +8,8 @@ from calendar import monthrange
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc, and_
 
-from src.trades.models import Trade
-from src.trades.schemas import TradeCreate, TradeUpdate, TradeClose, TradeReview
+from src.trades.models import Trade, MonthlyAnalysis
+from src.trades.schemas import TradeCreate, TradeUpdate, TradeClose, TradeReview, MonthlyAnalysisCreate
 
 
 class TradeService:
@@ -209,3 +209,84 @@ class TradeService:
             ).order_by(desc(Trade.exit_date))
         )
         return list(result.scalars().all())
+
+    # Monthly Analysis methods
+    async def save_monthly_analysis(self, user_id: int, data: MonthlyAnalysisCreate) -> MonthlyAnalysis:
+        """Save a monthly analysis"""
+        # Check if analysis for this month/year already exists
+        existing = await self.get_monthly_analysis(user_id, data.month, data.year)
+        if existing:
+            # Update existing
+            existing.total_trades = data.total_trades
+            existing.winning_trades = data.winning_trades
+            existing.losing_trades = data.losing_trades
+            existing.win_rate = data.win_rate
+            existing.total_pnl = data.total_pnl
+            existing.analysis_text = data.analysis_text
+            existing.images_analyzed = data.images_analyzed
+            await self.db.commit()
+            await self.db.refresh(existing)
+            return existing
+
+        # Create new
+        analysis = MonthlyAnalysis(
+            user_id=user_id,
+            month=data.month,
+            year=data.year,
+            total_trades=data.total_trades,
+            winning_trades=data.winning_trades,
+            losing_trades=data.losing_trades,
+            win_rate=data.win_rate,
+            total_pnl=data.total_pnl,
+            analysis_text=data.analysis_text,
+            images_analyzed=data.images_analyzed,
+        )
+        self.db.add(analysis)
+        await self.db.commit()
+        await self.db.refresh(analysis)
+        return analysis
+
+    async def get_monthly_analysis(self, user_id: int, month: int, year: int) -> Optional[MonthlyAnalysis]:
+        """Get a specific monthly analysis"""
+        result = await self.db.execute(
+            select(MonthlyAnalysis).where(
+                MonthlyAnalysis.user_id == user_id,
+                MonthlyAnalysis.month == month,
+                MonthlyAnalysis.year == year
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_all_monthly_analyses(self, user_id: int) -> tuple[List[MonthlyAnalysis], int]:
+        """Get all monthly analyses for a user"""
+        # Count
+        count_result = await self.db.execute(
+            select(func.count()).select_from(MonthlyAnalysis).where(MonthlyAnalysis.user_id == user_id)
+        )
+        total = count_result.scalar()
+
+        # Get all, ordered by year desc, month desc
+        result = await self.db.execute(
+            select(MonthlyAnalysis)
+            .where(MonthlyAnalysis.user_id == user_id)
+            .order_by(desc(MonthlyAnalysis.year), desc(MonthlyAnalysis.month))
+        )
+        analyses = list(result.scalars().all())
+
+        return analyses, total
+
+    async def delete_monthly_analysis(self, user_id: int, analysis_id: int) -> bool:
+        """Delete a monthly analysis"""
+        result = await self.db.execute(
+            select(MonthlyAnalysis).where(
+                MonthlyAnalysis.id == analysis_id,
+                MonthlyAnalysis.user_id == user_id
+            )
+        )
+        analysis = result.scalar_one_or_none()
+        if not analysis:
+            return False
+
+        await self.db.delete(analysis)
+        await self.db.commit()
+        return True

@@ -60,3 +60,28 @@ class Trade(Base):
     exit_date = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class MonthlyAnalysis(Base):
+    __tablename__ = "monthly_analyses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    # Period
+    month = Column(Integer, nullable=False)  # 1-12
+    year = Column(Integer, nullable=False)
+
+    # Stats snapshot
+    total_trades = Column(Integer, default=0)
+    winning_trades = Column(Integer, default=0)
+    losing_trades = Column(Integer, default=0)
+    win_rate = Column(Float, default=0)
+    total_pnl = Column(Float, default=0)
+
+    # AI Analysis
+    analysis_text = Column(Text, nullable=True)  # The AI-generated analysis
+    images_analyzed = Column(Integer, default=0)
+
+    # Dates
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
-import { Brain, TrendingUp, TrendingDown, Calendar, Loader2 } from 'lucide-react';
+import { Brain, TrendingUp, TrendingDown, Calendar, Loader2, ChevronDown, ChevronUp, Trash2, Save } from 'lucide-react';
 
 interface AnalysisResult {
   success: boolean;
@@ -19,6 +19,20 @@ interface AnalysisResult {
   error?: string;
 }
 
+interface SavedAnalysis {
+  id: number;
+  month: number;
+  year: number;
+  total_trades: number;
+  winning_trades: number;
+  losing_trades: number;
+  win_rate: number;
+  total_pnl: number;
+  analysis_text: string;
+  images_analyzed: number;
+  created_at: string;
+}
+
 const MONTHS = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
@@ -29,7 +43,27 @@ export default function AnalyticsPage() {
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [savedAnalyses, setSavedAnalyses] = useState<SavedAnalysis[]>([]);
+  const [expandedAnalysis, setExpandedAnalysis] = useState<number | null>(null);
+  const [loadingAnalyses, setLoadingAnalyses] = useState(true);
+
+  // Load saved analyses on mount
+  useEffect(() => {
+    loadSavedAnalyses();
+  }, []);
+
+  const loadSavedAnalyses = async () => {
+    try {
+      const data = await api.getMonthlyAnalyses() as { analyses: SavedAnalysis[]; total: number };
+      setSavedAnalyses(data.analyses || []);
+    } catch (error) {
+      console.error('Error loading analyses:', error);
+    } finally {
+      setLoadingAnalyses(false);
+    }
+  };
 
   const handleAnalyze = async () => {
     setLoading(true);
@@ -44,6 +78,42 @@ export default function AnalyticsPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveAnalysis = async () => {
+    if (!result || !result.success || !result.analysis) return;
+
+    setSaving(true);
+    try {
+      await api.saveMonthlyAnalysis({
+        month: result.month!,
+        year: result.year!,
+        total_trades: result.total_trades || 0,
+        winning_trades: result.winning_trades || 0,
+        losing_trades: result.losing_trades || 0,
+        win_rate: result.win_rate || 0,
+        total_pnl: 0, // TODO: Get from stats
+        analysis_text: result.analysis,
+        images_analyzed: result.images_analyzed || 0,
+      });
+      await loadSavedAnalyses();
+      setResult(null); // Clear current result after saving
+    } catch (error) {
+      console.error('Error saving analysis:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteAnalysis = async (id: number) => {
+    if (!confirm('¿Eliminar este análisis?')) return;
+    try {
+      await api.deleteMonthlyAnalysis(id);
+      setSavedAnalyses(savedAnalyses.filter(a => a.id !== id));
+      if (expandedAnalysis === id) setExpandedAnalysis(null);
+    } catch (error) {
+      console.error('Error deleting analysis:', error);
     }
   };
 
@@ -120,7 +190,7 @@ export default function AnalyticsPage() {
         </CardContent>
       </Card>
 
-      {/* Results */}
+      {/* Current Analysis Result */}
       {result && (
         <>
           {result.success ? (
@@ -161,18 +231,35 @@ export default function AnalyticsPage() {
                 </Card>
               </div>
 
-              {/* AI Analysis */}
+              {/* AI Analysis with Save Button */}
               <Card className="border-purple-500/30">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-purple-400">
-                    <Brain className="h-5 w-5" />
-                    Análisis de Claude
-                    {result.images_analyzed && result.images_analyzed > 0 && (
-                      <span className="text-xs text-zinc-500 font-normal ml-2">
-                        ({result.images_analyzed} imágenes analizadas)
-                      </span>
-                    )}
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-purple-400">
+                      <Brain className="h-5 w-5" />
+                      Análisis de Claude - {MONTHS[result.month! - 1]} {result.year}
+                      {result.images_analyzed && result.images_analyzed > 0 && (
+                        <span className="text-xs text-zinc-500 font-normal ml-2">
+                          ({result.images_analyzed} imágenes analizadas)
+                        </span>
+                      )}
+                    </CardTitle>
+                    <Button
+                      onClick={handleSaveAnalysis}
+                      disabled={saving}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {saving ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Save className="mr-2 h-4 w-4" />
+                          Guardar
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="prose prose-invert prose-sm max-w-none">
@@ -193,8 +280,83 @@ export default function AnalyticsPage() {
         </>
       )}
 
+      {/* Saved Analyses */}
+      {savedAnalyses.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-xl font-semibold text-white">Análisis Guardados</h2>
+          {savedAnalyses.map((analysis) => (
+            <Card
+              key={analysis.id}
+              className={`border-l-4 ${
+                analysis.win_rate >= 50 ? 'border-l-green-500' : 'border-l-red-500'
+              } cursor-pointer hover:bg-zinc-800/50 transition-colors`}
+            >
+              <CardContent className="py-3">
+                <div
+                  className="flex items-center justify-between"
+                  onClick={() => setExpandedAnalysis(expandedAnalysis === analysis.id ? null : analysis.id)}
+                >
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <span className="font-bold text-white text-lg">
+                        {MONTHS[analysis.month - 1]} {analysis.year}
+                      </span>
+                      <div className="text-xs text-zinc-400 mt-1">
+                        {analysis.total_trades} trades • {analysis.winning_trades}W / {analysis.losing_trades}L
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <div className={`font-bold ${analysis.win_rate >= 50 ? 'text-green-400' : 'text-red-400'}`}>
+                        {analysis.win_rate.toFixed(1)}% WR
+                      </div>
+                      <div className="text-xs text-zinc-500">
+                        {analysis.images_analyzed} imgs
+                      </div>
+                    </div>
+                    {expandedAnalysis === analysis.id ? (
+                      <ChevronUp className="h-5 w-5 text-zinc-400" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-zinc-400" />
+                    )}
+                  </div>
+                </div>
+
+                {/* Expanded Content */}
+                {expandedAnalysis === analysis.id && (
+                  <div className="mt-4 pt-4 border-t border-zinc-700">
+                    <div className="prose prose-invert prose-sm max-w-none mb-4">
+                      <div className="whitespace-pre-wrap text-zinc-300 leading-relaxed">
+                        {analysis.analysis_text}
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-zinc-500">
+                        Guardado: {new Date(analysis.created_at).toLocaleDateString('es-AR')}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteAnalysis(analysis.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Eliminar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
       {/* Empty State */}
-      {!result && !loading && (
+      {!result && !loading && savedAnalyses.length === 0 && !loadingAnalyses && (
         <Card>
           <CardContent className="py-12 text-center">
             <Brain className="h-16 w-16 text-zinc-700 mx-auto mb-4" />
@@ -206,6 +368,15 @@ export default function AnalyticsPage() {
               incluyendo los screenshots de los charts. Recibirás insights sobre
               qué setups funcionaron mejor y qué patrones evitar.
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Loading Analyses */}
+      {loadingAnalyses && (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <Loader2 className="h-8 w-8 text-zinc-400 animate-spin mx-auto" />
           </CardContent>
         </Card>
       )}
