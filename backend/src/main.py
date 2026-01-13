@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
     from src.auth.models import User
     from src.watchlist.models import WatchlistItem
     from src.scanner.models import ScanResult, ScanExecution
-    from src.trades.models import Trade
+    from src.trades.models import Trade, MonthlyAnalysis
     from src.solana.models import SolanaWallet, SolanaTrade, TokenCache
 
     # Startup
