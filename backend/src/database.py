@@ -8,7 +8,8 @@ settings = get_settings()
 database_url = settings.async_database_url
 
 # Debug: show which database we're connecting to
-print(f"DATABASE CONFIG: Using database URL: {database_url[:50]}..." if len(database_url) > 50 else f"DATABASE CONFIG: Using database URL: {database_url}")
+db_display = database_url[:50] + "..." if len(database_url) > 50 else database_url
+print(f"DATABASE CONFIG: {db_display}", flush=True)
 
 # Adjust pool settings based on database type
 is_sqlite = database_url.startswith("sqlite")
