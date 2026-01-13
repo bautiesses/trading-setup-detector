@@ -103,9 +103,10 @@ export default function AnalyticsPage() {
       } catch (saveError) {
         // Si falla guardar, igual mostramos el análisis temporalmente
         console.error('Error saving analysis:', saveError);
+        const saveErrorMsg = saveError instanceof Error ? saveError.message : 'Error desconocido';
         setResult({
           ...data,
-          error: undefined // Mostrar el análisis aunque no se haya podido guardar
+          error: `No se pudo guardar: ${saveErrorMsg}` // Mostrar el análisis con el error de guardado
         });
       }
     } catch (error: unknown) {
@@ -281,7 +282,7 @@ export default function AnalyticsPage() {
               </div>
             </div>
             <p className="text-xs text-yellow-500 mt-4">
-              El análisis no se pudo guardar. Copiá el texto si lo necesitás.
+              {result.error || 'El análisis no se pudo guardar. Copiá el texto si lo necesitás.'}
             </p>
           </CardContent>
         </Card>
