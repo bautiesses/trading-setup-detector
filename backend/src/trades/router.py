@@ -207,7 +207,7 @@ async def save_monthly_analysis(
     return analysis
 
 
-@router.get("/analyses", response_model=MonthlyAnalysisListResponse)
+@router.get("/analyses")
 async def get_monthly_analyses(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -216,20 +216,25 @@ async def get_monthly_analyses(
     service = TradeService(db)
     analyses, total = await service.get_all_monthly_analyses(current_user.id)
 
-    # Debug: print each analysis to see what's causing validation errors
-    validated = []
+    # Debug: return raw data to see what's in the database
+    result = []
     for a in analyses:
-        try:
-            print(f"Validating analysis: id={a.id}, month={a.month}, year={a.year}, analysis_text={type(a.analysis_text)}, created_at={a.created_at}")
-            validated.append(MonthlyAnalysisResponse.model_validate(a))
-        except Exception as e:
-            print(f"Validation error for analysis {a.id}: {e}")
-            raise
+        result.append({
+            "id": a.id,
+            "month": a.month,
+            "year": a.year,
+            "total_trades": a.total_trades,
+            "winning_trades": a.winning_trades,
+            "losing_trades": a.losing_trades,
+            "win_rate": a.win_rate,
+            "total_pnl": a.total_pnl,
+            "analysis_text": a.analysis_text[:100] if a.analysis_text else None,  # Truncate for logs
+            "images_analyzed": a.images_analyzed,
+            "created_at": str(a.created_at) if a.created_at else None,
+        })
+    print(f"Raw analyses data: {result}")
 
-    return MonthlyAnalysisListResponse(
-        analyses=validated,
-        total=total
-    )
+    return {"analyses": result, "total": total}
 
 
 @router.delete("/analyses/{analysis_id}")
