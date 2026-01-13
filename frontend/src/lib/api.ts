@@ -96,9 +96,28 @@ class ApiClient {
     }
 
     if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}));
-      const errorMsg = errorBody.detail || errorBody.message || errorBody.error || JSON.stringify(errorBody);
-      throw new Error(`${response.status}: ${errorMsg || 'Request failed'}`);
+      let errorMsg = 'Request failed';
+      try {
+        const errorBody = await response.json();
+        // FastAPI validation errors have a specific format
+        if (errorBody.detail) {
+          if (Array.isArray(errorBody.detail)) {
+            // Pydantic validation error format
+            errorMsg = errorBody.detail.map((e: { loc?: string[]; msg?: string }) =>
+              `${e.loc?.join('.')}: ${e.msg}`
+            ).join(', ');
+          } else if (typeof errorBody.detail === 'string') {
+            errorMsg = errorBody.detail;
+          } else {
+            errorMsg = JSON.stringify(errorBody.detail);
+          }
+        } else {
+          errorMsg = JSON.stringify(errorBody);
+        }
+      } catch {
+        errorMsg = `HTTP ${response.status}`;
+      }
+      throw new Error(`${response.status}: ${errorMsg}`);
     }
 
     if (response.status === 204) {
