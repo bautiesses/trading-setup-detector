@@ -94,13 +94,18 @@ export default function AnalyticsPage() {
         setResult(data);
       }
     } catch (error: unknown) {
+      console.error('Analysis error:', error);
       let errorMessage = 'Error al analizar';
       if (error instanceof Error) {
         errorMessage = error.message;
       } else if (typeof error === 'string') {
         errorMessage = error;
-      } else if (error && typeof error === 'object' && 'message' in error) {
-        errorMessage = String((error as { message: unknown }).message);
+      } else if (error && typeof error === 'object') {
+        try {
+          errorMessage = JSON.stringify(error);
+        } catch {
+          errorMessage = String(error);
+        }
       }
       setResult({
         success: false,
@@ -200,7 +205,17 @@ export default function AnalyticsPage() {
         <Card className="border-red-500/30">
           <CardContent className="py-8 text-center">
             <p className="text-red-400">
-              {typeof result.error === 'string' ? result.error : JSON.stringify(result.error)}
+              {(() => {
+                const err = result.error;
+                if (!err) return 'Error desconocido';
+                if (typeof err === 'string') return err;
+                if (err instanceof Error) return err.message;
+                try {
+                  return JSON.stringify(err, null, 2);
+                } catch {
+                  return String(err);
+                }
+              })()}
             </p>
           </CardContent>
         </Card>
