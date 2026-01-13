@@ -215,8 +215,19 @@ async def get_monthly_analyses(
     """Get all saved monthly analyses"""
     service = TradeService(db)
     analyses, total = await service.get_all_monthly_analyses(current_user.id)
+
+    # Debug: print each analysis to see what's causing validation errors
+    validated = []
+    for a in analyses:
+        try:
+            print(f"Validating analysis: id={a.id}, month={a.month}, year={a.year}, analysis_text={type(a.analysis_text)}, created_at={a.created_at}")
+            validated.append(MonthlyAnalysisResponse.model_validate(a))
+        except Exception as e:
+            print(f"Validation error for analysis {a.id}: {e}")
+            raise
+
     return MonthlyAnalysisListResponse(
-        analyses=[MonthlyAnalysisResponse.model_validate(a) for a in analyses],
+        analyses=validated,
         total=total
     )
 
