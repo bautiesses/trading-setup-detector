@@ -93,10 +93,18 @@ export default function AnalyticsPage() {
         // Solo mostrar error si falló
         setResult(data);
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      let errorMessage = 'Error al analizar';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = String((error as { message: unknown }).message);
+      }
       setResult({
         success: false,
-        error: error instanceof Error ? error.message : 'Error al analizar'
+        error: errorMessage
       });
     } finally {
       setLoading(false);
@@ -191,7 +199,9 @@ export default function AnalyticsPage() {
       {result && !result.success && (
         <Card className="border-red-500/30">
           <CardContent className="py-8 text-center">
-            <p className="text-red-400">{result.error}</p>
+            <p className="text-red-400">
+              {typeof result.error === 'string' ? result.error : JSON.stringify(result.error)}
+            </p>
           </CardContent>
         </Card>
       )}
