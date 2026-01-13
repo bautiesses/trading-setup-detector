@@ -66,11 +66,22 @@ export default function AnalyticsPage() {
 
   const handleAnalyze = async () => {
     setLoading(true);
+    setResult(null);
     try {
+      // Paso 1: Analizar con IA
       const data = await api.analyzeMonth(selectedMonth, selectedYear) as AnalysisResult;
 
-      // Si el análisis fue exitoso, guardarlo automáticamente
-      if (data.success && data.analysis) {
+      if (!data.success) {
+        // El análisis falló
+        setResult({
+          success: false,
+          error: data.error || 'Error al analizar'
+        });
+        return;
+      }
+
+      // Paso 2: Intentar guardar (puede fallar si la tabla no existe)
+      try {
         await api.saveMonthlyAnalysis({
           month: data.month!,
           year: data.year!,
@@ -79,7 +90,7 @@ export default function AnalyticsPage() {
           losing_trades: data.losing_trades || 0,
           win_rate: data.win_rate || 0,
           total_pnl: 0,
-          analysis_text: data.analysis,
+          analysis_text: data.analysis!,
           images_analyzed: data.images_analyzed || 0,
         });
         await loadSavedAnalyses();
@@ -89,24 +100,46 @@ export default function AnalyticsPage() {
         if (justSaved) {
           setExpandedAnalysis(justSaved.id);
         }
-      } else {
-        // Solo mostrar error si falló
-        setResult(data);
+      } catch (saveError) {
+        // Si falla guardar, igual mostramos el análisis temporalmente
+        console.error('Error saving analysis:', saveError);
+        setResult({
+          ...data,
+          error: undefined // Mostrar el análisis aunque no se haya podido guardar
+        });
       }
     } catch (error: unknown) {
       console.error('Analysis error:', error);
       let errorMessage = 'Error al analizar';
+
       if (error instanceof Error) {
         errorMessage = error.message;
       } else if (typeof error === 'string') {
         errorMessage = error;
       } else if (error && typeof error === 'object') {
-        try {
-          errorMessage = JSON.stringify(error);
-        } catch {
-          errorMessage = String(error);
+        // Try to extract useful error info from object
+        const errObj = error as Record<string, unknown>;
+        if (typeof errObj.message === 'string') {
+          errorMessage = errObj.message;
+        } else if (typeof errObj.detail === 'string') {
+          errorMessage = errObj.detail;
+        } else if (typeof errObj.error === 'string') {
+          errorMessage = errObj.error;
+        } else {
+          try {
+            const jsonStr = JSON.stringify(error);
+            if (jsonStr && jsonStr !== '{}') {
+              errorMessage = jsonStr;
+            } else {
+              errorMessage = 'Error desconocido al procesar la solicitud';
+            }
+          } catch {
+            // Avoid String(error) which gives "[object Object]"
+            errorMessage = 'Error desconocido al analizar';
+          }
         }
       }
+
       setResult({
         success: false,
         error: errorMessage
@@ -201,21 +234,54 @@ export default function AnalyticsPage() {
       </Card>
 
       {/* Error Display */}
-      {result && !result.success && (
+      {result && !result.success && result.error && (
         <Card className="border-red-500/30">
           <CardContent className="py-8 text-center">
             <p className="text-red-400">
-              {(() => {
-                const err = result.error;
-                if (!err) return 'Error desconocido';
-                if (typeof err === 'string') return err;
-                if (err instanceof Error) return err.message;
-                try {
-                  return JSON.stringify(err, null, 2);
-                } catch {
-                  return String(err);
-                }
-              })()}
+              {typeof result.error === 'string' ? result.error : 'Error al procesar la solicitud'}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Temporary Analysis Display (when save fails but analysis worked) */}
+      {result && result.success && result.analysis && (
+        <Card className="border-l-4 border-l-yellow-500">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-yellow-400">
+              <Brain className="h-5 w-5" />
+              Análisis de {MONTHS[(result.month || 1) - 1]} {result.year}
+              <span className="text-xs text-zinc-500 ml-2">(No guardado)</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-4 gap-4 mb-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-white">{result.total_trades}</div>
+                <div className="text-xs text-zinc-400">Trades</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-400">{result.winning_trades}</div>
+                <div className="text-xs text-zinc-400">Ganadores</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-red-400">{result.losing_trades}</div>
+                <div className="text-xs text-zinc-400">Perdedores</div>
+              </div>
+              <div className="text-center">
+                <div className={`text-2xl font-bold ${(result.win_rate || 0) >= 50 ? 'text-green-400' : 'text-red-400'}`}>
+                  {(result.win_rate || 0).toFixed(1)}%
+                </div>
+                <div className="text-xs text-zinc-400">Win Rate</div>
+              </div>
+            </div>
+            <div className="prose prose-invert prose-sm max-w-none">
+              <div className="whitespace-pre-wrap text-zinc-300 leading-relaxed">
+                {result.analysis}
+              </div>
+            </div>
+            <p className="text-xs text-yellow-500 mt-4">
+              El análisis no se pudo guardar. Copiá el texto si lo necesitás.
             </p>
           </CardContent>
         </Card>
