@@ -136,13 +136,13 @@ class MonthlyAnalysisResponse(BaseModel):
     id: int
     month: int
     year: int
-    total_trades: int
-    winning_trades: int
-    losing_trades: int
-    win_rate: float
-    total_pnl: float
-    analysis_text: str
-    images_analyzed: int
+    total_trades: int = 0
+    winning_trades: int = 0
+    losing_trades: int = 0
+    win_rate: float = 0
+    total_pnl: float = 0
+    analysis_text: Optional[str] = None
+    images_analyzed: int = 0
     created_at: datetime
 
     class Config:
