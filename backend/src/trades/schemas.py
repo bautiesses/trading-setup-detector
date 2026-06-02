@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field
+import json
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -16,6 +17,7 @@ class TradeCreate(BaseModel):
     strategy: Optional[str] = None
     confidence_level: Optional[int] = Field(None, ge=1, le=5)
     entry_date: Optional[datetime] = None
+    entry_reasons: Optional[List[str]] = None  # VAH, POC, VAL, VWAP, ABSORPTION
 
 
 class TradeUpdate(BaseModel):
@@ -40,6 +42,7 @@ class TradeUpdate(BaseModel):
     strategy: Optional[str] = None
     confidence_level: Optional[int] = Field(None, ge=1, le=5)
     exit_date: Optional[datetime] = None
+    entry_reasons: Optional[List[str]] = None  # VAH, POC, VAL, VWAP, ABSORPTION
 
 
 class TradeClose(BaseModel):
@@ -77,9 +80,22 @@ class TradeResponse(BaseModel):
     timeframe: Optional[str]
     strategy: Optional[str]
     confidence_level: Optional[int]
+    entry_reasons: Optional[List[str]] = None
     entry_date: datetime
     exit_date: Optional[datetime]
     created_at: datetime
+
+    @field_validator('entry_reasons', mode='before')
+    @classmethod
+    def parse_entry_reasons(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return None
+        return v
 
     class Config:
         from_attributes = True

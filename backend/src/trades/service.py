@@ -2,6 +2,7 @@
 Trade Service - CRUD operations for trades
 """
 
+import json
 from typing import List, Optional
 from datetime import datetime
 from calendar import monthrange
@@ -33,6 +34,7 @@ class TradeService:
             strategy=data.strategy,
             confidence_level=data.confidence_level,
             entry_date=data.entry_date or datetime.now(),
+            entry_reasons=json.dumps(data.entry_reasons) if data.entry_reasons else None,
         )
         self.db.add(trade)
         await self.db.commit()
@@ -81,6 +83,9 @@ class TradeService:
 
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
+            # Convert entry_reasons list to JSON string
+            if key == "entry_reasons" and value is not None:
+                value = json.dumps(value)
             setattr(trade, key, value)
 
         # Recalculate PnL if trade is closed and relevant fields changed

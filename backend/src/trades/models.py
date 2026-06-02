@@ -55,6 +55,9 @@ class Trade(Base):
     strategy = Column(String(100), nullable=True)  # e.g., "Break & Retest"
     confidence_level = Column(Integer, nullable=True)  # 1-5 trader confidence
 
+    # Entry reasons (JSON array: VAH, POC, VAL, VWAP, ABSORPTION)
+    entry_reasons = Column(Text, nullable=True)  # JSON array of entry reasons
+
     # Dates
     entry_date = Column(DateTime(timezone=True), server_default=func.now())
     exit_date = Column(DateTime(timezone=True), nullable=True)

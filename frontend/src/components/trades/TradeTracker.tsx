@@ -34,6 +34,10 @@ import {
   Star,
 } from 'lucide-react';
 
+// Available entry reasons for trades
+const ENTRY_REASONS = ['VAH', 'POC', 'VAL', 'VWAP', 'ABSORPTION'] as const;
+type EntryReason = typeof ENTRY_REASONS[number];
+
 interface Trade {
   id: number;
   symbol: string;
@@ -56,6 +60,7 @@ interface Trade {
   timeframe: string | null;
   strategy: string | null;
   confidence_level: number | null;
+  entry_reasons: string[] | null;
   entry_date: string;
   exit_date: string | null;
 }
@@ -110,6 +115,7 @@ export function TradeTracker() {
     timeframe: '1h',
     strategy: 'Break & Retest',
     confidence_level: 3,
+    entry_reasons: [] as string[],
     entry_date: getTodayDate(),
     // Exit fields (for editing closed trades)
     exit_price: '',
@@ -177,6 +183,7 @@ export function TradeTracker() {
       timeframe: '1h',
       strategy: 'Break & Retest',
       confidence_level: 3,
+      entry_reasons: [],
       entry_date: getTodayDate(),
       exit_price: '',
       exit_notes: '',
@@ -201,6 +208,7 @@ export function TradeTracker() {
       timeframe: trade.timeframe || '1h',
       strategy: trade.strategy || 'Break & Retest',
       confidence_level: trade.confidence_level || 3,
+      entry_reasons: trade.entry_reasons || [],
       entry_date: trade.entry_date ? new Date(trade.entry_date).toISOString().slice(0, 16) : getTodayDate(),
       // Exit fields
       exit_price: trade.exit_price?.toString() || '',
@@ -229,6 +237,7 @@ export function TradeTracker() {
         timeframe: formData.timeframe || undefined,
         strategy: formData.strategy || undefined,
         confidence_level: formData.confidence_level,
+        entry_reasons: formData.entry_reasons.length > 0 ? formData.entry_reasons : undefined,
         entry_date: formData.entry_date ? new Date(formData.entry_date).toISOString() : undefined,
       };
 
@@ -673,7 +682,7 @@ export function TradeTracker() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <div>
                   <label className="text-xs text-zinc-400">Stop Loss</label>
                   <Input
@@ -709,14 +718,31 @@ export function TradeTracker() {
                     <option value="1d">1d</option>
                   </select>
                 </div>
-                <div>
-                  <label className="text-xs text-zinc-400">Estrategia</label>
-                  <Input
-                    value={formData.strategy}
-                    onChange={(e) => setFormData({ ...formData, strategy: e.target.value })}
-                    placeholder="Break & Retest"
-                    className="bg-zinc-800 border-zinc-700"
-                  />
+              </div>
+
+              {/* Entry Reasons */}
+              <div>
+                <label className="text-xs text-zinc-400 mb-2 block">Motivo de Entrada</label>
+                <div className="flex flex-wrap gap-2">
+                  {ENTRY_REASONS.map((reason) => (
+                    <button
+                      key={reason}
+                      type="button"
+                      onClick={() => {
+                        const newReasons = formData.entry_reasons.includes(reason)
+                          ? formData.entry_reasons.filter(r => r !== reason)
+                          : [...formData.entry_reasons, reason];
+                        setFormData({ ...formData, entry_reasons: newReasons });
+                      }}
+                      className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                        formData.entry_reasons.includes(reason)
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                      }`}
+                    >
+                      {reason}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -1028,8 +1054,17 @@ export function TradeTracker() {
                           {trade.status === 'open' ? 'Abierto' : 'Cerrado'}
                         </Badge>
                       </div>
-                      <div className="text-xs text-zinc-400">
-                        Entry: ${formatPrice(trade.entry_price)} • Size: ${trade.size}{trade.timeframe && ` • ${trade.timeframe}`}
+                      <div className="text-xs text-zinc-400 flex items-center gap-2">
+                        <span>Entry: ${formatPrice(trade.entry_price)} • Size: ${trade.size}{trade.timeframe && ` • ${trade.timeframe}`}</span>
+                        {trade.entry_reasons && trade.entry_reasons.length > 0 && (
+                          <div className="flex gap-1">
+                            {trade.entry_reasons.map((reason) => (
+                              <span key={reason} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-600/30 text-emerald-400">
+                                {reason}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1104,6 +1139,18 @@ export function TradeTracker() {
                         </div>
                       )}
                     </div>
+                    )}
+
+                    {/* Entry Reasons - hide when editing */}
+                    {editingTrade?.id !== trade.id && trade.entry_reasons && trade.entry_reasons.length > 0 && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-zinc-400">Motivos:</span>
+                        {trade.entry_reasons.map((reason) => (
+                          <Badge key={reason} variant="secondary" className="text-xs bg-emerald-600/20 text-emerald-400">
+                            {reason}
+                          </Badge>
+                        ))}
+                      </div>
                     )}
 
                     {/* Images & Notes - Side by Side - hide when editing */}
@@ -1249,7 +1296,7 @@ export function TradeTracker() {
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                             <div>
                               <label className="text-xs text-zinc-400">Stop Loss</label>
                               <Input
@@ -1285,14 +1332,31 @@ export function TradeTracker() {
                                 <option value="1d">1d</option>
                               </select>
                             </div>
-                            <div>
-                              <label className="text-xs text-zinc-400">Estrategia</label>
-                              <Input
-                                value={formData.strategy}
-                                onChange={(e) => setFormData({ ...formData, strategy: e.target.value })}
-                                placeholder="Break & Retest"
-                                className="bg-zinc-800 border-zinc-700"
-                              />
+                          </div>
+
+                          {/* Entry Reasons */}
+                          <div>
+                            <label className="text-xs text-zinc-400 mb-2 block">Motivo de Entrada</label>
+                            <div className="flex flex-wrap gap-2">
+                              {ENTRY_REASONS.map((reason) => (
+                                <button
+                                  key={reason}
+                                  type="button"
+                                  onClick={() => {
+                                    const newReasons = formData.entry_reasons.includes(reason)
+                                      ? formData.entry_reasons.filter(r => r !== reason)
+                                      : [...formData.entry_reasons, reason];
+                                    setFormData({ ...formData, entry_reasons: newReasons });
+                                  }}
+                                  className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                                    formData.entry_reasons.includes(reason)
+                                      ? 'bg-emerald-600 text-white'
+                                      : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'
+                                  }`}
+                                >
+                                  {reason}
+                                </button>
+                              ))}
                             </div>
                           </div>
 
